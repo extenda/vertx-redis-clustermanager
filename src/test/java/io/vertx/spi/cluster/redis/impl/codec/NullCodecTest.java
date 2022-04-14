@@ -1,15 +1,18 @@
 package io.vertx.spi.cluster.redis.impl.codec;
 
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 import org.junit.jupiter.api.Test;
 
 class NullCodecTest extends CodecTestBase {
   @Test
   void nullValue() {
-    encodeDecode(NullCodec.INSTANCE, null);
+    assertNull(encodeDecode(NullCodec.INSTANCE, null));
   }
 
   @Test
   void copyCodec() {
-    copy(NullCodec.INSTANCE);
+    assertNotSame(NullCodec.INSTANCE, copy(NullCodec.INSTANCE));
   }
 }

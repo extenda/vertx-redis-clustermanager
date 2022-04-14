@@ -1,20 +1,23 @@
 package io.vertx.spi.cluster.redis.impl.codec;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+
 import org.junit.jupiter.api.Test;
 
 class BooleanCodecTest extends CodecTestBase {
   @Test
   void trueValue() {
-    encodeDecode(BooleanCodec.INSTANCE, true);
+    assertEquals(true, encodeDecode(BooleanCodec.INSTANCE, true));
   }
 
   @Test
   void falseValue() {
-    encodeDecode(BooleanCodec.INSTANCE, false);
+    assertEquals(false, encodeDecode(BooleanCodec.INSTANCE, false));
   }
 
   @Test
   void copyCodec() {
-    copy(BooleanCodec.INSTANCE);
+    assertNotSame(BooleanCodec.INSTANCE, copy(BooleanCodec.INSTANCE));
   }
 }

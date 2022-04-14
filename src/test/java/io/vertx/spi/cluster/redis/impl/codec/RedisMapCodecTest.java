@@ -1,5 +1,9 @@
 package io.vertx.spi.cluster.redis.impl.codec;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.spi.cluster.NodeInfo;
 import java.util.Locale;
@@ -8,45 +12,48 @@ import org.redisson.client.codec.Codec;
 
 class RedisMapCodecTest extends CodecTestBase {
 
-  private Codec codec = RedisMapCodec.INSTANCE;
+  private final Codec codec = RedisMapCodec.INSTANCE;
 
   @Test
   void stringValue() {
-    encodeDecode(codec, "test");
+    assertEquals("test", encodeDecode(codec, "test"));
   }
 
   @Test
   void nullValue() {
-    encodeDecode(codec, null);
+    assertNull(encodeDecode(codec, null));
   }
 
   @Test
   void booleanValue() {
-    encodeDecode(codec, true);
+    assertEquals(true, encodeDecode(codec, true));
   }
 
   @Test
   void integerValue() {
-    encodeDecode(codec, 10);
+    assertEquals(10, encodeDecode(codec, 10));
   }
 
   @Test
   void longValue() {
-    encodeDecode(codec, 10L);
+    assertEquals(10L, encodeDecode(codec, 10L));
   }
 
   @Test
   void serializableValue() {
-    encodeDecode(codec, Locale.ENGLISH);
+    assertEquals(Locale.ENGLISH, encodeDecode(codec, Locale.ENGLISH));
   }
 
   @Test
   void clusterSerializableValue() {
-    encodeDecode(codec, new NodeInfo("localhost", 8080, new JsonObject().put("version", "1.0.0")));
+    NodeInfo info = new NodeInfo("localhost", 8080, new JsonObject().put("version", "1.0.0"));
+    NodeInfo decoded = encodeDecode(codec, info);
+    assertEquals(info, decoded);
+    assertNotSame(info, decoded);
   }
 
   @Test
   void copyCodec() {
-    copy(RedisMapCodec.INSTANCE);
+    assertNotSame(RedisMapCodec.INSTANCE, copy(RedisMapCodec.INSTANCE));
   }
 }

@@ -3,6 +3,7 @@ package io.vertx.spi.cluster.redis.impl.codec;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.netty.buffer.ByteBuf;
@@ -53,6 +54,6 @@ class ClusterSerializableCodecTest extends CodecTestBase {
 
   @Test
   void copyCodec() {
-    copy(ClusterSerializableCodec.INSTANCE);
+    assertNotSame(ClusterSerializableCodec.INSTANCE, copy(ClusterSerializableCodec.INSTANCE));
   }
 }
