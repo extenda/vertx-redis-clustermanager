@@ -13,11 +13,11 @@ public class RedisKeyFactory {
 
   /**
    * Create a key factory with the default namespace. The default namespace is loaded from the
-   * <code>redis.keyNamespace</code> system property or the <code>REDIS_KEY_NAMESPACE</code> env
+   * <code>redis.key.namespace</code> system property or the <code>REDIS_KEY_NAMESPACE</code> env
    * var.
    */
   public RedisKeyFactory() {
-    this(System.getProperty("redis.keyNamespace", System.getenv("REDIS_KEY_NAMESPACE")));
+    this(RedisConfigProps.getPropertyValue("redis.key.namespace"));
   }
 
   /**

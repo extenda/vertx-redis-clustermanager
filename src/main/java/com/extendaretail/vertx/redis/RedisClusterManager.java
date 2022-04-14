@@ -7,6 +7,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import com.extendaretail.vertx.redis.impl.NodeInfoCatalog;
 import com.extendaretail.vertx.redis.impl.NodeInfoCatalogListener;
 import com.extendaretail.vertx.redis.impl.RedisAsyncMap;
+import com.extendaretail.vertx.redis.impl.RedisConfigProps;
 import com.extendaretail.vertx.redis.impl.RedisCounter;
 import com.extendaretail.vertx.redis.impl.RedisKeyFactory;
 import com.extendaretail.vertx.redis.impl.RedisLock;
@@ -30,7 +31,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.redisson.Redisson;
 import org.redisson.api.RLock;
@@ -62,8 +62,9 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private SubscriptionCatalog subscriptionCatalog;
   private ExecutorService lockReleaseExec;
 
+  /** Create a Redis cluster manager configured from system properties or environment variables. */
   public RedisClusterManager() {
-    this(new Config());
+    this(RedisConfigProps.createRedissonConfig());
   }
 
   public RedisClusterManager(Config config) {
@@ -71,6 +72,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     this.customRedissonClient = false;
   }
 
+  // Consider removing this to not leak any Redisson impl details.
   public RedisClusterManager(RedissonClient redisson) {
     this.redisson = redisson;
     this.customRedissonClient = true;
@@ -107,7 +109,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
           do {
             long start = System.nanoTime();
             try {
-              locked = semaphore.tryAcquire(remaining, TimeUnit.MILLISECONDS);
+              locked = semaphore.tryAcquire(remaining, MILLISECONDS);
             } catch (InterruptedException e) {
               Thread.currentThread().interrupt();
               throw new VertxException("Interrupted while waiting for lock.", e);
