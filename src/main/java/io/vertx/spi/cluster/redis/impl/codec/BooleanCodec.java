@@ -21,12 +21,24 @@ public class BooleanCodec extends BaseCodec {
         return out;
       };
 
+  /** Create a BooleanCodec. */
   public BooleanCodec() {}
 
+  /**
+   * Create a BooleanCodec.
+   *
+   * @param classLoader required by Codec contract
+   */
   public BooleanCodec(ClassLoader classLoader) {
     this();
   }
 
+  /**
+   * Create a BooleanCodec.
+   *
+   * @param classLoader required by Codec contract
+   * @param codec required by Codec contract
+   */
   public BooleanCodec(ClassLoader classLoader, BooleanCodec codec) {
     this(classLoader);
   }

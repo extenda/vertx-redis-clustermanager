@@ -52,12 +52,24 @@ public class ClusterSerializableCodec extends BaseCodec {
         return out;
       };
 
+  /** Create a ClusterSerializableCodec. */
   public ClusterSerializableCodec() {}
 
+  /**
+   * Create a ClusterSerializableCodec.
+   *
+   * @param classLoader required by Codec contract
+   */
   public ClusterSerializableCodec(ClassLoader classLoader) {
     this();
   }
 
+  /**
+   * Create a ClusterSerializableCodec.
+   *
+   * @param classLoader required by Codec contract
+   * @param codec required by Codec contract
+   */
   public ClusterSerializableCodec(ClassLoader classLoader, ClusterSerializableCodec codec) {
     this(classLoader);
   }

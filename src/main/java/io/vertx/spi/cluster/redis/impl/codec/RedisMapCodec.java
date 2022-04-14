@@ -25,7 +25,7 @@ public class RedisMapCodec extends BaseCodec {
     BOOLEAN(Boolean.class, BooleanCodec.INSTANCE, 2),
     VERTX(ClusterSerializable.class, ClusterSerializableCodec.INSTANCE, 3),
     JDK(Serializable.class, new SerializationCodec(), 4),
-    NULL(Void.class, NullCodec.INSTANCE, 5);
+    NULL(Void.class, NullCodec.INSTANCE, 5),
     ;
 
     private final Class<?> type;
@@ -75,12 +75,24 @@ public class RedisMapCodec extends BaseCodec {
         return Unpooled.wrappedBuffer(header, payload);
       };
 
+  /** Create a RedisMapCodec. */
   public RedisMapCodec() {}
 
+  /**
+   * Create a RedisMapCodec.
+   *
+   * @param classLoader required by Codec contract
+   */
   public RedisMapCodec(ClassLoader classLoader) {
     this();
   }
 
+  /**
+   * Create a RedisMapCodec.
+   *
+   * @param classLoader required by Codec contract
+   * @param codec required by Codec contract
+   */
   public RedisMapCodec(ClassLoader classLoader, RedisMapCodec codec) {
     this(classLoader);
   }

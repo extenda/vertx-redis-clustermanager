@@ -25,12 +25,24 @@ public class NullCodec extends BaseCodec {
         return out;
       };
 
+  /** Create a NullCodec. */
   public NullCodec() {}
 
+  /**
+   * Create a NullCodec.
+   *
+   * @param classLoader required by Codec contract
+   */
   public NullCodec(ClassLoader classLoader) {
     this();
   }
 
+  /**
+   * Create a NullCodec.
+   *
+   * @param classLoader required by Codec contract
+   * @param codec required by Codec contract
+   */
   public NullCodec(ClassLoader classLoader, NullCodec codec) {
     this(classLoader);
   }
