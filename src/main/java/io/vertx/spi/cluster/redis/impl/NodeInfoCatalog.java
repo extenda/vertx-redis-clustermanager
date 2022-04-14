@@ -2,6 +2,7 @@ package io.vertx.spi.cluster.redis.impl;
 
 import io.vertx.core.Vertx;
 import io.vertx.core.spi.cluster.NodeInfo;
+import io.vertx.spi.cluster.redis.impl.codec.RedisMapCodec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;

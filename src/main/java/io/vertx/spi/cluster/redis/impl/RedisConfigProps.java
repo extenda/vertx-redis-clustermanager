@@ -1,13 +1,13 @@
 package io.vertx.spi.cluster.redis.impl;
 
-import org.redisson.config.Config;
+import java.net.URI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Utility to access configuration from system properties that fallback to environment variables.
  */
-public final class RedisConfigProps {
+final class RedisConfigProps {
 
   private static final Logger log = LoggerFactory.getLogger(RedisConfigProps.class);
 
@@ -41,11 +41,11 @@ public final class RedisConfigProps {
   }
 
   /**
-   * Create a Redisson {@link Config} from system properties.
+   * Returns the Redis server address.
    *
-   * @return the redisson configuration.
+   * @return the configured Redis server address.
    */
-  public static Config createRedissonConfig() {
+  static URI getServerAddress() {
     String scheme = getPropertyValue("redis.connection.scheme", "redis");
     String host = getPropertyValue("redis.connection.host", "127.0.0.1");
     String port = getPropertyValue("redis.connection.port", "6379");
@@ -54,9 +54,6 @@ public final class RedisConfigProps {
     String address = getPropertyValue("redis.connection.address", defaultAddress);
 
     log.debug("Redis address: [{}]", address);
-
-    Config config = new Config();
-    config.useSingleServer().setAddress(address);
-    return config;
+    return URI.create(address);
   }
 }

@@ -1,4 +1,4 @@
-package io.vertx.spi.cluster.redis.impl;
+package io.vertx.spi.cluster.redis.impl.shareddata;
 
 import io.vertx.core.shareddata.Lock;
 import java.util.concurrent.ExecutorService;

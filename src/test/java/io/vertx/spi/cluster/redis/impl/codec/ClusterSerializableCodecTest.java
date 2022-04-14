@@ -1,4 +1,4 @@
-package io.vertx.spi.cluster.redis.impl;
+package io.vertx.spi.cluster.redis.impl.codec;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -16,9 +16,10 @@ import org.junit.jupiter.api.Test;
 import org.redisson.client.codec.Codec;
 import org.redisson.client.handler.State;
 
-class ClusterSerializableCodecTest {
-  private Codec codec = ClusterSerializableCodec.INSTANCE;
-  private NodeInfo info = new NodeInfo("localhost", 8080, new JsonObject().put("version", "1.0.0"));
+class ClusterSerializableCodecTest extends CodecTestBase {
+  private final Codec codec = ClusterSerializableCodec.INSTANCE;
+  private final NodeInfo info =
+      new NodeInfo("localhost", 8080, new JsonObject().put("version", "1.0.0"));
 
   @Test
   void encode() {
@@ -48,5 +49,10 @@ class ClusterSerializableCodecTest {
   @Test
   void encodeFailsIfNotClusterSerializable() {
     assertThrows(IOException.class, () -> codec.getValueEncoder().encode("Test"));
+  }
+
+  @Test
+  void copyCodec() {
+    copy(ClusterSerializableCodec.INSTANCE);
   }
 }

@@ -1,37 +1,33 @@
-package io.vertx.spi.cluster.redis.impl;
+package io.vertx.spi.cluster.redis.impl.codec;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import java.io.IOException;
 import org.redisson.client.codec.BaseCodec;
 import org.redisson.client.codec.Codec;
 import org.redisson.client.protocol.Decoder;
 import org.redisson.client.protocol.Encoder;
 
-/** A Redisson codec for null values. */
-public class NullCodec extends BaseCodec {
+/** A Redisson codec for boolean values. */
+public class BooleanCodec extends BaseCodec {
 
-  public static final Codec INSTANCE = new NullCodec();
+  public static final Codec INSTANCE = new BooleanCodec();
 
-  final Decoder<Object> decoder = (buf, state) -> null;
+  private final Decoder<Object> decoder = (buf, state) -> buf.readBoolean();
 
-  final Encoder encoder =
+  private final Encoder encoder =
       in -> {
-        if (in != null) {
-          throw new IOException("Unexpected non-null value: " + in);
-        }
         ByteBuf out = ByteBufAllocator.DEFAULT.buffer();
-        out.writeByte(0);
+        out.writeBoolean((Boolean) in);
         return out;
       };
 
-  public NullCodec() {}
+  public BooleanCodec() {}
 
-  public NullCodec(ClassLoader classLoader) {
+  public BooleanCodec(ClassLoader classLoader) {
     this();
   }
 
-  public NullCodec(ClassLoader classLoader, NullCodec codec) {
+  public BooleanCodec(ClassLoader classLoader, BooleanCodec codec) {
     this(classLoader);
   }
 

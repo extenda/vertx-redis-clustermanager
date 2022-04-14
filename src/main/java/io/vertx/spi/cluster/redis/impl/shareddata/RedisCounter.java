@@ -1,4 +1,4 @@
-package io.vertx.spi.cluster.redis.impl;
+package io.vertx.spi.cluster.redis.impl.shareddata;
 
 import static io.vertx.core.Future.fromCompletionStage;
 

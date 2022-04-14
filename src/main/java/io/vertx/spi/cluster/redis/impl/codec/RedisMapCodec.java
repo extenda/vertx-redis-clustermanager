@@ -1,4 +1,4 @@
-package io.vertx.spi.cluster.redis.impl;
+package io.vertx.spi.cluster.redis.impl.codec;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -61,13 +61,13 @@ public class RedisMapCodec extends BaseCodec {
     }
   }
 
-  final Decoder<Object> decoder =
+  private final Decoder<Object> decoder =
       (buf, state) -> {
         ValueCodec vc = ValueCodec.forEncoded(buf);
         return vc.codec.getValueDecoder().decode(buf, state);
       };
 
-  final Encoder encoder =
+  private final Encoder encoder =
       in -> {
         ValueCodec vc = ValueCodec.forObject(in);
         ByteBuf header = ByteBufAllocator.DEFAULT.buffer().writeInt(vc.id);

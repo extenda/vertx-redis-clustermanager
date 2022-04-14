@@ -6,6 +6,7 @@ import io.vertx.core.Vertx;
 import io.vertx.core.spi.cluster.NodeSelector;
 import io.vertx.core.spi.cluster.RegistrationInfo;
 import io.vertx.core.spi.cluster.RegistrationUpdateEvent;
+import io.vertx.spi.cluster.redis.impl.codec.RedisMapCodec;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;

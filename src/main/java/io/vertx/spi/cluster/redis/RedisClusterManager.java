@@ -18,13 +18,12 @@ import io.vertx.core.spi.cluster.NodeSelector;
 import io.vertx.core.spi.cluster.RegistrationInfo;
 import io.vertx.spi.cluster.redis.impl.NodeInfoCatalog;
 import io.vertx.spi.cluster.redis.impl.NodeInfoCatalogListener;
-import io.vertx.spi.cluster.redis.impl.RedisAsyncMap;
-import io.vertx.spi.cluster.redis.impl.RedisConfigProps;
-import io.vertx.spi.cluster.redis.impl.RedisCounter;
 import io.vertx.spi.cluster.redis.impl.RedisKeyFactory;
-import io.vertx.spi.cluster.redis.impl.RedisLock;
-import io.vertx.spi.cluster.redis.impl.RedisMapCodec;
 import io.vertx.spi.cluster.redis.impl.SubscriptionCatalog;
+import io.vertx.spi.cluster.redis.impl.codec.RedisMapCodec;
+import io.vertx.spi.cluster.redis.impl.shareddata.RedisAsyncMap;
+import io.vertx.spi.cluster.redis.impl.shareddata.RedisCounter;
+import io.vertx.spi.cluster.redis.impl.shareddata.RedisLock;
 import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
@@ -54,28 +53,30 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   private final AtomicBoolean active = new AtomicBoolean();
 
-  private final boolean customRedissonClient;
-  private Config redisConfig;
+  private final Config redisConfig;
   private RedissonClient redisson;
 
   private NodeInfoCatalog nodeInfoCatalog;
   private SubscriptionCatalog subscriptionCatalog;
   private ExecutorService lockReleaseExec;
 
-  /** Create a Redis cluster manager configured from system properties or environment variables. */
+  /**
+   * Create a Redis cluster manager configured from system properties or environment variables.
+   *
+   * @see RedisConfig#withDefaults()
+   */
   public RedisClusterManager() {
-    this(RedisConfigProps.createRedissonConfig());
+    this(RedisConfig.withDefaults());
   }
 
-  public RedisClusterManager(Config config) {
-    this.redisConfig = config;
-    this.customRedissonClient = false;
-  }
-
-  // Consider removing this to not leak any Redisson impl details.
-  public RedisClusterManager(RedissonClient redisson) {
-    this.redisson = redisson;
-    this.customRedissonClient = true;
+  /**
+   * Create a Redis cluster manager with specified configuration.
+   *
+   * @param config the redis configuration
+   */
+  public RedisClusterManager(RedisConfig config) {
+    redisConfig = new Config();
+    redisConfig.useSingleServer().setAddress(config.getServerAddress().toASCIIString());
   }
 
   @Override
@@ -191,10 +192,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
                 Executors.newCachedThreadPool(
                     r -> new Thread(r, "vertx-redis-service-release-lock-thread"));
 
-            if (!customRedissonClient) {
-              redisson = Redisson.create(redisConfig);
-            }
-
+            redisson = Redisson.create(redisConfig);
             nodeInfoCatalog = new NodeInfoCatalog(vertx, redisson, nodeId.toString(), this);
             subscriptionCatalog = new SubscriptionCatalog(vertx, redisson, nodeSelector);
           } else {
