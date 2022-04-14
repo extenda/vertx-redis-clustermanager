@@ -36,6 +36,13 @@ environment variables.
 
 The project is built with OpenJDK 8 and Maven.
 
+To build the project with all tests, run
 ```bash
 ./mnw verify
+```
+
+Ensure you install and enable [pre-commit](https://pre-commit.com) before committing code.
+
+```bash
+pre-commit install -t pre-commit -t commit-msg
 ```
