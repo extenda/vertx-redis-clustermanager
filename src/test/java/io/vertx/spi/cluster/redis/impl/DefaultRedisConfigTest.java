@@ -21,6 +21,20 @@ class DefaultRedisConfigTest {
   }
 
   @Test
+  void withSchemeHostPort() {
+    RedisConfig config = RedisConfig.withAddress("redis", "test", 1234);
+    assertEquals("redis", config.getScheme());
+    assertEquals("test", config.getHost());
+    assertEquals(1234, config.getPort());
+    assertFalse(config.isSecureConnection());
+  }
+
+  @Test
+  void withSchemeHostPortInvalid() {
+    assertThrows(IllegalArgumentException.class, () -> RedisConfig.withAddress("!!", "|!", 1234));
+  }
+
+  @Test
   void withAddressString() {
     RedisConfig config = RedisConfig.withAddress("rediss://test:1234");
     assertEquals("rediss", config.getScheme());
