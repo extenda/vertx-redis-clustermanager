@@ -1,6 +1,9 @@
 package io.vertx.spi.cluster.redis;
 
 import static com.jayway.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.vertx.core.Vertx;
@@ -30,6 +33,19 @@ class ITRedisInstance {
           vertx = ar.result();
         });
     await().until(() -> vertx != null);
+  }
+
+  @Test
+  void nullRedisInstance() {
+    RedisClusterManager mgr = new RedisClusterManager();
+    assertFalse(mgr.isActive());
+    assertNull(mgr.getRedisInstance());
+  }
+
+  @Test
+  void getRedisInstance() {
+    assertTrue(clusterManager.isActive());
+    assertNotNull(clusterManager.getRedisInstance());
   }
 
   @Test
