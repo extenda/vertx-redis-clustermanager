@@ -47,5 +47,12 @@ public interface RedisInstance {
      * @throws InterruptedException - if the thread is interrupted
      */
     boolean tryLock(long waitTime, long leaseTime, TimeUnit unit) throws InterruptedException;
+
+    /**
+     * Checks if the lock locked by any thread
+     *
+     * @return <code>true</code> if locked otherwise <code>false</code>
+     */
+    boolean isLocked();
   }
 }

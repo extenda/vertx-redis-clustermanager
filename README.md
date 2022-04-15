@@ -21,7 +21,7 @@ with [Google Cloud MemoryStore for Redis](https://cloud.google.com/memorystore/d
 
 ### Configuration
 
-The manager can be configured programatically, but the preferred option is to use the supported system properties or
+The manager can be configured programmatically, but the preferred option is to use the supported system properties or
 environment variables.
 
 | System Property          | Environment Variable     | Default                                  | Description                                                                                                      |

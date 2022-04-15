@@ -24,6 +24,7 @@ import io.vertx.spi.cluster.redis.impl.codec.RedisMapCodec;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisAsyncMap;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisCounter;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisLock;
+import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
@@ -300,7 +301,16 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     vertx.executeBlocking(prom -> prom.complete(subscriptionCatalog.get(address)), false, promise);
   }
 
+  /**
+   * Returns a Redis instance object. This method returns <code>null</code> when the cluster manager
+   * is inactive.
+   *
+   * @return the redis instance or <code>null</code> if not active.
+   */
   public RedisInstance getRedisInstance() {
+    if (!isActive()) {
+      return null;
+    }
     return new RedissonRedisInstance(redisson);
   }
 
@@ -314,11 +324,20 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     @Override
     public DistributedLock getLock(String name) {
       RLock lock = redisson.getLock(RedisKeyFactory.INSTANCE.lock(name));
+      // Nope this doesn't work as they don't share an interface
       return (DistributedLock)
           Proxy.newProxyInstance(
               lock.getClass().getClassLoader(),
               new Class<?>[] {DistributedLock.class},
-              (proxy, method, args) -> method.invoke(lock, args));
+              (proxy, method, args) -> {
+                Method targetMethod =
+                    lock.getClass().getMethod(method.getName(), method.getParameterTypes());
+                if (targetMethod == null) {
+                  throw new NoSuchMethodException(
+                      method + " is not implemented in proxy target " + lock.getClass().getName());
+                }
+                return targetMethod.invoke(lock, args);
+              });
     }
   }
 }
