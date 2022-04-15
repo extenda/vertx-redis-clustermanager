@@ -24,6 +24,7 @@ import io.vertx.spi.cluster.redis.impl.codec.RedisMapCodec;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisAsyncMap;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisCounter;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisLock;
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.List;
@@ -321,23 +322,22 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
       this.redisson = redisson;
     }
 
+    private InvocationHandler signatureMatchingInvocationHandler(Object target) {
+      return (proxy, method, args) -> {
+        Method targetMethod =
+            target.getClass().getMethod(method.getName(), method.getParameterTypes());
+        return targetMethod.invoke(target, args);
+      };
+    }
+
     @Override
     public DistributedLock getLock(String name) {
       RLock lock = redisson.getLock(RedisKeyFactory.INSTANCE.lock(name));
-      // Nope this doesn't work as they don't share an interface
       return (DistributedLock)
           Proxy.newProxyInstance(
               lock.getClass().getClassLoader(),
               new Class<?>[] {DistributedLock.class},
-              (proxy, method, args) -> {
-                Method targetMethod =
-                    lock.getClass().getMethod(method.getName(), method.getParameterTypes());
-                if (targetMethod == null) {
-                  throw new NoSuchMethodException(
-                      method + " is not implemented in proxy target " + lock.getClass().getName());
-                }
-                return targetMethod.invoke(lock, args);
-              });
+              signatureMatchingInvocationHandler(lock));
     }
   }
 }
