@@ -90,7 +90,7 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
                 result -> {
                   if (result != null) {
                     // Replace was successful, update TTL
-                    return updateTimeToLive(k, ttl).thenCompose((b) -> succeededWith(result));
+                    return updateTimeToLive(k, ttl).thenCompose(b -> succeededWith(result));
                   } else {
                     return succeededWith(null);
                   }
@@ -110,11 +110,11 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
         map.replaceAsync(k, oldValue, newValue)
             .thenCompose(
                 result -> {
-                  if (result) {
+                  if (Boolean.TRUE.equals(result)) {
                     // Replace was successful, update TTL
-                    return updateTimeToLive(k, ttl).thenCompose((b) -> succeededWith(result));
+                    return updateTimeToLive(k, ttl).thenCompose(b -> succeededWith(true));
                   } else {
-                    return succeededWith(result);
+                    return succeededWith(false);
                   }
                 }),
         vertx.getOrCreateContext());
