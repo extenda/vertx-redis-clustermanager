@@ -30,6 +30,8 @@ import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -62,6 +64,9 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private SubscriptionCatalog subscriptionCatalog;
   private ExecutorService lockReleaseExec;
 
+  private final ConcurrentMap<String, AsyncMap<?, ?>> asyncMapCache = new ConcurrentHashMap<>();
+  private final ConcurrentMap<String, RSemaphore> locksCache = new ConcurrentHashMap<>();
+
   /**
    * Create a Redis cluster manager configured from system properties or environment variables.
    *
@@ -93,7 +98,12 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public <K, V> void getAsyncMap(String name, Promise<AsyncMap<K, V>> promise) {
-    promise.complete(new RedisAsyncMap<>(vertx, getMapCache(name)));
+    @SuppressWarnings("unchecked")
+    AsyncMap<K, V> map =
+        (AsyncMap<K, V>)
+            asyncMapCache.computeIfAbsent(
+                name, key -> new RedisAsyncMap<>(vertx, getMapCache(key)));
+    promise.complete(map);
   }
 
   @Override
@@ -101,12 +111,17 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     return getMapCache(name);
   }
 
+  private RSemaphore createSemaphore(String name) {
+    RSemaphore semaphore = redisson.getSemaphore(RedisKeyFactory.INSTANCE.lock(name));
+    semaphore.trySetPermits(1);
+    return semaphore;
+  }
+
   @Override
   public void getLockWithTimeout(String name, long timeout, Promise<Lock> promise) {
     vertx.executeBlocking(
         prom -> {
-          RSemaphore semaphore = redisson.getSemaphore(RedisKeyFactory.INSTANCE.lock(name));
-          semaphore.trySetPermits(1);
+          RSemaphore semaphore = locksCache.computeIfAbsent(name, this::createSemaphore);
           boolean locked;
           long remaining = timeout;
           do {
