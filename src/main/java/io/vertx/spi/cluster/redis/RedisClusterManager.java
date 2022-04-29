@@ -29,6 +29,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -40,11 +41,16 @@ import org.redisson.api.RLock;
 import org.redisson.api.RMapCache;
 import org.redisson.api.RSemaphore;
 import org.redisson.api.RedissonClient;
+import org.redisson.api.redisnode.RedisNodes;
 import org.redisson.config.Config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** A Vert.x cluster manager for Redis. */
+/**
+ * A Vert.x cluster manager for Redis.
+ *
+ * @author sasjo
+ */
 public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListener {
 
   private static final Logger log = LoggerFactory.getLogger(RedisClusterManager.class);
@@ -318,16 +324,16 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   /**
-   * Returns a Redis instance object. This method returns <code>null</code> when the cluster manager
+   * Returns a Redis instance object. This method returns an empty optional when the cluster manager
    * is inactive.
    *
-   * @return the redis instance or <code>null</code> if not active.
+   * @return the redis instance if active.
    */
-  public RedisInstance getRedisInstance() {
+  public Optional<RedisInstance> getRedisInstance() {
     if (!isActive()) {
-      return null;
+      return Optional.empty();
     }
-    return new RedissonRedisInstance(redisson);
+    return Optional.of(new RedissonRedisInstance(redisson));
   }
 
   private static class RedissonRedisInstance implements RedisInstance {
@@ -335,6 +341,11 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
     private RedissonRedisInstance(RedissonClient redisson) {
       this.redisson = redisson;
+    }
+
+    @Override
+    public boolean ping() {
+      return redisson.getRedisNodes(RedisNodes.SINGLE).pingAll();
     }
 
     private InvocationHandler signatureMatchingInvocationHandler(Object target) {

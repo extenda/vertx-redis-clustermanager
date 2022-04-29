@@ -2,8 +2,6 @@ package io.vertx.spi.cluster.redis;
 
 import static com.jayway.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.vertx.core.Vertx;
@@ -39,18 +37,22 @@ class ITRedisInstance {
   void nullRedisInstance() {
     RedisClusterManager mgr = new RedisClusterManager();
     assertFalse(mgr.isActive());
-    assertNull(mgr.getRedisInstance());
+    assertFalse(mgr.getRedisInstance().isPresent());
   }
 
   @Test
   void getRedisInstance() {
     assertTrue(clusterManager.isActive());
-    assertNotNull(clusterManager.getRedisInstance());
+    assertTrue(clusterManager.getRedisInstance().isPresent());
   }
 
   @Test
   void lockLeaseTime() {
-    RedisInstance.DistributedLock lock = clusterManager.getRedisInstance().getLock("lockTest");
+    RedisInstance.DistributedLock lock =
+        clusterManager
+            .getRedisInstance()
+            .orElseThrow(IllegalStateException::new)
+            .getLock("lockTest");
     lock.lock(2, TimeUnit.SECONDS);
     assertTrue(lock.isLocked());
     await().atMost(3, TimeUnit.SECONDS).until(() -> !lock.isLocked());
@@ -58,10 +60,21 @@ class ITRedisInstance {
 
   @Test
   void tryLockLeaseTime() throws InterruptedException {
-    RedisInstance.DistributedLock lock = clusterManager.getRedisInstance().getLock("tryLocKTest");
+    RedisInstance.DistributedLock lock =
+        clusterManager
+            .getRedisInstance()
+            .orElseThrow(IllegalStateException::new)
+            .getLock("tryLocKTest");
     boolean locked = lock.tryLock(1, 2, TimeUnit.SECONDS);
     assertTrue(locked);
     assertTrue(lock.isLocked());
     await().atMost(3, TimeUnit.SECONDS).until(() -> !lock.isLocked());
+  }
+
+  @Test
+  void ping() {
+    RedisInstance redisInstance =
+        clusterManager.getRedisInstance().orElseThrow(IllegalStateException::new);
+    assertTrue(redisInstance.ping());
   }
 }
