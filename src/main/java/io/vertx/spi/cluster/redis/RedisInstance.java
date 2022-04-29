@@ -6,6 +6,8 @@ import java.util.concurrent.locks.Lock;
 /**
  * Low-level access to distributed data types backed by Redis. Prefer Vertx shared data types over
  * using this API.
+ *
+ * @author sasjo
  */
 public interface RedisInstance {
 
@@ -16,6 +18,13 @@ public interface RedisInstance {
    * @return a distributed lock.
    */
   DistributedLock getLock(String name);
+
+  /**
+   * Ping the Redis instance(s) to determine availability.
+   *
+   * @return <code>true</code> if ping is successful, otherwise <code>false</code>.
+   */
+  boolean ping();
 
   /** A distributed lock with lease time support. */
   interface DistributedLock extends Lock {

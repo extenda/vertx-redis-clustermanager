@@ -207,6 +207,12 @@
       <artifactId>testcontainers</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>io.vertx</groupId>
+      <artifactId>vertx-health-check</artifactId>
+      <scope>provide</scope>
+      <optional>true</optional>
+    </dependency>
   </dependencies>
 
   <build>

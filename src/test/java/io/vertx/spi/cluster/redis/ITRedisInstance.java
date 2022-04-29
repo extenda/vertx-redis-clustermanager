@@ -50,7 +50,11 @@ class ITRedisInstance {
 
   @Test
   void lockLeaseTime() {
-    RedisInstance.DistributedLock lock = clusterManager.getRedisInstance().getLock("lockTest");
+    RedisInstance.DistributedLock lock =
+        clusterManager
+            .getRedisInstance()
+            .orElseThrow(IllegalStateException::new)
+            .getLock("lockTest");
     lock.lock(2, TimeUnit.SECONDS);
     assertTrue(lock.isLocked());
     await().atMost(3, TimeUnit.SECONDS).until(() -> !lock.isLocked());
@@ -58,10 +62,21 @@ class ITRedisInstance {
 
   @Test
   void tryLockLeaseTime() throws InterruptedException {
-    RedisInstance.DistributedLock lock = clusterManager.getRedisInstance().getLock("tryLocKTest");
+    RedisInstance.DistributedLock lock =
+        clusterManager
+            .getRedisInstance()
+            .orElseThrow(IllegalStateException::new)
+            .getLock("tryLocKTest");
     boolean locked = lock.tryLock(1, 2, TimeUnit.SECONDS);
     assertTrue(locked);
     assertTrue(lock.isLocked());
     await().atMost(3, TimeUnit.SECONDS).until(() -> !lock.isLocked());
+  }
+
+  @Test
+  void ping() {
+    RedisInstance redisInstance =
+        clusterManager.getRedisInstance().orElseThrow(IllegalStateException::new);
+    assertTrue(redisInstance.ping());
   }
 }
