@@ -51,6 +51,7 @@ public class ClusterSerializableCodec extends BaseCodec {
         ((ClusterSerializable) in).writeToBuffer(Buffer.buffer(out));
         return out;
       };
+  private ClassLoader classLoader;
 
   /** Create a ClusterSerializableCodec. */
   public ClusterSerializableCodec() {}
@@ -62,6 +63,7 @@ public class ClusterSerializableCodec extends BaseCodec {
    */
   public ClusterSerializableCodec(ClassLoader classLoader) {
     this();
+    this.classLoader = classLoader;
   }
 
   /**
@@ -82,5 +84,13 @@ public class ClusterSerializableCodec extends BaseCodec {
   @Override
   public Encoder getValueEncoder() {
     return encoder;
+  }
+
+  @Override
+  public ClassLoader getClassLoader() {
+    if (classLoader != null) {
+      return classLoader;
+    }
+    return super.getClassLoader();
   }
 }
