@@ -67,8 +67,6 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private final Config redisConfig;
   private RedissonClient redisson;
 
-  private final RedisMapCodec codec;
-
   private NodeInfoCatalog nodeInfoCatalog;
   private SubscriptionCatalog subscriptionCatalog;
   private ExecutorService lockReleaseExec;
@@ -104,7 +102,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     Objects.requireNonNull(dataClassLoader);
     redisConfig = new Config();
     redisConfig.useSingleServer().setAddress(config.getServerAddress().toASCIIString());
-    codec = new RedisMapCodec(dataClassLoader);
+    redisConfig.setCodec(new RedisMapCodec(dataClassLoader));
   }
 
   @Override
@@ -114,7 +112,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   private <K, V> RMapCache<K, V> getMapCache(String name) {
-    return redisson.getMapCache(RedisKeyFactory.INSTANCE.map(name), codec);
+    return redisson.getMapCache(RedisKeyFactory.INSTANCE.map(name));
   }
 
   @Override
@@ -231,8 +229,8 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
                     r -> new Thread(r, "vertx-redis-service-release-lock-thread"));
 
             redisson = Redisson.create(redisConfig);
-            nodeInfoCatalog = new NodeInfoCatalog(vertx, redisson, codec, nodeId.toString(), this);
-            subscriptionCatalog = new SubscriptionCatalog(vertx, redisson, codec, nodeSelector);
+            nodeInfoCatalog = new NodeInfoCatalog(vertx, redisson, nodeId.toString(), this);
+            subscriptionCatalog = new SubscriptionCatalog(vertx, redisson, nodeSelector);
           } else {
             log.warn("Already activated, nodeId: {}", nodeId);
           }

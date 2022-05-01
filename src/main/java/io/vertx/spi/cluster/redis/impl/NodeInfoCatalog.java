@@ -2,7 +2,6 @@ package io.vertx.spi.cluster.redis.impl;
 
 import io.vertx.core.Vertx;
 import io.vertx.core.spi.cluster.NodeInfo;
-import io.vertx.spi.cluster.redis.impl.codec.RedisMapCodec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -25,14 +24,10 @@ public class NodeInfoCatalog {
   private final long timerId;
 
   public NodeInfoCatalog(
-      Vertx vertx,
-      RedissonClient redisson,
-      RedisMapCodec codec,
-      String nodeId,
-      NodeInfoCatalogListener listener) {
+      Vertx vertx, RedissonClient redisson, String nodeId, NodeInfoCatalogListener listener) {
     this.vertx = vertx;
     this.nodeId = nodeId;
-    nodeInfoMap = redisson.getMapCache(RedisKeyFactory.INSTANCE.vertx("nodeInfo"), codec);
+    nodeInfoMap = redisson.getMapCache(RedisKeyFactory.INSTANCE.vertx("nodeInfo"));
 
     // These listeners will detect map modifications from other nodes.
     EntryCreatedListener<String, NodeInfo> entryCreated =
