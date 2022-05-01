@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.vertx.core.shareddata.impl.ClusterSerializable;
+import java.io.IOException;
 import java.io.Serializable;
 import org.redisson.client.codec.BaseCodec;
 import org.redisson.client.codec.Codec;
@@ -16,7 +17,7 @@ import org.redisson.codec.SerializationCodec;
 /** A general purpose Redisson Codec for types supported by shared data maps. */
 public class RedisMapCodec extends BaseCodec {
 
-  public static final Codec INSTANCE = new RedisMapCodec();
+  private ClassLoader classLoader;
 
   private enum ValueCodec {
     // Enum is ordered according to codec priority
@@ -50,11 +51,15 @@ public class RedisMapCodec extends BaseCodec {
       throw new IllegalArgumentException("No Codec found for type:" + value.getClass().getName());
     }
 
-    static ValueCodec forEncoded(ByteBuf buf) {
+    static Codec forEncoded(ByteBuf buf, ClassLoader classLoader) throws IOException {
       int id = buf.readInt();
       for (ValueCodec codec : ValueCodec.values()) {
         if (codec.id == id) {
-          return codec;
+          try {
+            return BaseCodec.copy(classLoader, codec.codec);
+          } catch (ReflectiveOperationException e) {
+            throw new IOException("Failed to copy Codec " + codec.codec.getClass().getName(), e);
+          }
         }
       }
       throw new IllegalArgumentException("No Codec found for id:" + id);
@@ -63,8 +68,8 @@ public class RedisMapCodec extends BaseCodec {
 
   private final Decoder<Object> decoder =
       (buf, state) -> {
-        ValueCodec vc = ValueCodec.forEncoded(buf);
-        return vc.codec.getValueDecoder().decode(buf, state);
+        Codec codec = ValueCodec.forEncoded(buf, getClassLoader());
+        return codec.getValueDecoder().decode(buf, state);
       };
 
   private final Encoder encoder =
@@ -85,6 +90,7 @@ public class RedisMapCodec extends BaseCodec {
    */
   public RedisMapCodec(ClassLoader classLoader) {
     this();
+    this.classLoader = classLoader;
   }
 
   /**
@@ -105,5 +111,13 @@ public class RedisMapCodec extends BaseCodec {
   @Override
   public Encoder getValueEncoder() {
     return encoder;
+  }
+
+  @Override
+  public ClassLoader getClassLoader() {
+    if (classLoader != null) {
+      return classLoader;
+    }
+    return super.getClassLoader();
   }
 }

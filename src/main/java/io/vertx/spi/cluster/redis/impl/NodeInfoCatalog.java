@@ -25,11 +25,14 @@ public class NodeInfoCatalog {
   private final long timerId;
 
   public NodeInfoCatalog(
-      Vertx vertx, RedissonClient redisson, String nodeId, NodeInfoCatalogListener listener) {
+      Vertx vertx,
+      RedissonClient redisson,
+      RedisMapCodec codec,
+      String nodeId,
+      NodeInfoCatalogListener listener) {
     this.vertx = vertx;
     this.nodeId = nodeId;
-    nodeInfoMap =
-        redisson.getMapCache(RedisKeyFactory.INSTANCE.vertx("nodeInfo"), RedisMapCodec.INSTANCE);
+    nodeInfoMap = redisson.getMapCache(RedisKeyFactory.INSTANCE.vertx("nodeInfo"), codec);
 
     // These listeners will detect map modifications from other nodes.
     EntryCreatedListener<String, NodeInfo> entryCreated =

@@ -1,3 +1,7 @@
+### Specific ###
+
+!src/test/resources/CustomObject.class
+
 ### Vert.x ###
 .vertx/
 
