@@ -102,7 +102,10 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     Objects.requireNonNull(dataClassLoader);
     redisConfig = new Config();
     redisConfig.useSingleServer().setAddress(config.getServerAddress().toASCIIString());
-    redisConfig.setCodec(new RedisMapCodec(dataClassLoader));
+    if (dataClassLoader != getClass().getClassLoader()) {
+      redisConfig.setCodec(new RedisMapCodec(dataClassLoader));
+      redisConfig.setUseThreadClassLoader(false);
+    }
   }
 
   @Override

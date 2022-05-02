@@ -3,7 +3,6 @@ package io.vertx.core.shareddata;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import io.vertx.core.VertxOptions;
 import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.spi.cluster.redis.RedisClusterManager;
 import io.vertx.spi.cluster.redis.RedisConfig;
@@ -22,12 +21,15 @@ public class ITCustomClassLoaderAsyncMap extends VertxTestBase {
       new CustomObjectClassLoader(ClassLoader.getSystemClassLoader());
 
   @Override
-  protected VertxOptions getOptions() {
-    ClusterManager clusterManager =
-        new RedisClusterManager(
-            RedisConfig.withAddress("redis", redis.getHost(), redis.getFirstMappedPort()),
-            classLoader);
-    return new VertxOptions().setClusterManager(clusterManager);
+  protected ClusterManager getClusterManager() {
+    return new RedisClusterManager(
+        RedisConfig.withAddress("redis", redis.getHost(), redis.getFirstMappedPort()), classLoader);
+  }
+
+  @Override
+  public void setUp() throws Exception {
+    super.setUp();
+    startNodes(2);
   }
 
   @Test
@@ -37,13 +39,19 @@ public class ITCustomClassLoaderAsyncMap extends VertxTestBase {
   }
 
   @Test
+  public void customObjectOnClassLoader() {
+    assertDoesNotThrow(
+        () -> Class.forName(CustomObjectClassLoader.CUSTOM_OBJECT, false, classLoader));
+  }
+
+  @Test
   public void mapPutGetCustomObjectWithClassLoader() throws Exception {
     Class<?> objectClass =
         assertDoesNotThrow(() -> classLoader.loadClass(CustomObjectClassLoader.CUSTOM_OBJECT));
     Object value = objectClass.getDeclaredConstructor().newInstance();
     assertEquals(classLoader, value.getClass().getClassLoader());
 
-    vertx
+    vertices[0]
         .sharedData()
         .<String, Object>getAsyncMap("foo")
         .onSuccess(
@@ -51,7 +59,7 @@ public class ITCustomClassLoaderAsyncMap extends VertxTestBase {
               map.put("test", value)
                   .onSuccess(
                       vd -> {
-                        vertx
+                        vertices[1]
                             .sharedData()
                             .<String, Object>getAsyncMap("foo")
                             .onSuccess(
@@ -63,7 +71,8 @@ public class ITCustomClassLoaderAsyncMap extends VertxTestBase {
                                                 classLoader, res.getClass().getClassLoader());
                                             assertEquals(value, res);
                                             testComplete();
-                                          });
+                                          })
+                                      .onFailure(this::fail);
                                 });
                       });
             });
