@@ -1,5 +1,6 @@
 package io.vertx.spi.cluster.redis.impl.codec;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -12,7 +13,7 @@ import org.redisson.client.codec.Codec;
 
 class RedisMapCodecTest extends CodecTestBase {
 
-  private final Codec codec = RedisMapCodec.INSTANCE;
+  private final Codec codec = new RedisMapCodec();
 
   @Test
   void stringValue() {
@@ -54,6 +55,22 @@ class RedisMapCodecTest extends CodecTestBase {
 
   @Test
   void copyCodec() {
-    assertNotSame(RedisMapCodec.INSTANCE, copy(RedisMapCodec.INSTANCE));
+    assertNotSame(codec, copy(codec));
+  }
+
+  @Test
+  void customClassLoader() throws Exception {
+    CustomObjectClassLoader classLoader =
+        new CustomObjectClassLoader(ClassLoader.getSystemClassLoader());
+    RedisMapCodec codec = new RedisMapCodec(classLoader);
+    Class<?> objectClass =
+        assertDoesNotThrow(() -> classLoader.loadClass(CustomObjectClassLoader.CUSTOM_OBJECT));
+
+    Object object = objectClass.getDeclaredConstructor().newInstance();
+    Object decoded = encodeDecode(codec, object);
+    assertNotSame(object, decoded);
+    assertEquals(object, decoded);
+    assertEquals(classLoader, object.getClass().getClassLoader());
+    assertEquals(classLoader, decoded.getClass().getClassLoader());
   }
 }

@@ -29,6 +29,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -88,8 +89,23 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
    * @param config the redis configuration
    */
   public RedisClusterManager(RedisConfig config) {
+    this(config, RedisClusterManager.class.getClassLoader());
+  }
+
+  /**
+   * Create a Redis cluster manager with specified configuration.
+   *
+   * @param config the redis configuration
+   * @param dataClassLoader class loader used to restore keys and values returned from Redis
+   */
+  public RedisClusterManager(RedisConfig config, ClassLoader dataClassLoader) {
+    Objects.requireNonNull(dataClassLoader);
     redisConfig = new Config();
     redisConfig.useSingleServer().setAddress(config.getServerAddress().toASCIIString());
+    redisConfig.setCodec(new RedisMapCodec(dataClassLoader));
+    if (dataClassLoader != getClass().getClassLoader()) {
+      redisConfig.setUseThreadClassLoader(false);
+    }
   }
 
   @Override
@@ -99,7 +115,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   private <K, V> RMapCache<K, V> getMapCache(String name) {
-    return redisson.getMapCache(RedisKeyFactory.INSTANCE.map(name), RedisMapCodec.INSTANCE);
+    return redisson.getMapCache(RedisKeyFactory.INSTANCE.map(name));
   }
 
   @Override

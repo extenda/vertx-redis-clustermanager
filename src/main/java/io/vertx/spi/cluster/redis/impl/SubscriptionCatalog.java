@@ -6,7 +6,6 @@ import io.vertx.core.Vertx;
 import io.vertx.core.spi.cluster.NodeSelector;
 import io.vertx.core.spi.cluster.RegistrationInfo;
 import io.vertx.core.spi.cluster.RegistrationUpdateEvent;
-import io.vertx.spi.cluster.redis.impl.codec.RedisMapCodec;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -45,8 +44,7 @@ public class SubscriptionCatalog {
   public SubscriptionCatalog(Vertx vertx, RedissonClient redisson, NodeSelector nodeSelector) {
     this.vertx = vertx;
     this.nodeSelector = nodeSelector;
-    subsMap =
-        redisson.getSetMultimap(RedisKeyFactory.INSTANCE.vertx("subs"), RedisMapCodec.INSTANCE);
+    subsMap = redisson.getSetMultimap(RedisKeyFactory.INSTANCE.vertx("subs"));
     topic = redisson.getTopic(RedisKeyFactory.INSTANCE.topic("subs"));
     listenerId = topic.addListener(String.class, this::onMessage);
   }

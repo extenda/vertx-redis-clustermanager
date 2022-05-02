@@ -7,13 +7,12 @@ import io.vertx.core.shareddata.impl.ClusterSerializable;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
-import org.redisson.client.codec.BaseCodec;
 import org.redisson.client.codec.Codec;
 import org.redisson.client.protocol.Decoder;
 import org.redisson.client.protocol.Encoder;
 
 /** A Redisson codec for {@link ClusterSerializable} shared data. */
-public class ClusterSerializableCodec extends BaseCodec {
+public class ClusterSerializableCodec extends ClassLoaderCodec {
 
   public static final Codec INSTANCE = new ClusterSerializableCodec();
 
@@ -61,7 +60,7 @@ public class ClusterSerializableCodec extends BaseCodec {
    * @param classLoader required by Codec contract
    */
   public ClusterSerializableCodec(ClassLoader classLoader) {
-    this();
+    super(classLoader);
   }
 
   /**
