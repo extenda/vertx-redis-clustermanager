@@ -20,7 +20,7 @@ public class CustomObjectClassLoader extends ClassLoader {
     if (CUSTOM_OBJECT.equals(name)) {
       try {
         byte[] classBytes =
-            Files.readAllBytes(Paths.get("src", "test", "resources", CUSTOM_OBJECT + ".class"));
+            Files.readAllBytes(Paths.get("src", "test", "test-class", CUSTOM_OBJECT + ".class"));
         return defineClass(CUSTOM_OBJECT, classBytes, 0, classBytes.length);
       } catch (Exception e) {
         throw new ClassNotFoundException("Failed to load " + CUSTOM_OBJECT, e);

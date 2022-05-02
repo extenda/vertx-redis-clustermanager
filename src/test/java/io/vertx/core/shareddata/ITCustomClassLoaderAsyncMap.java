@@ -1,6 +1,7 @@
 package io.vertx.core.shareddata;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.vertx.core.VertxOptions;
 import io.vertx.core.spi.cluster.ClusterManager;
@@ -27,6 +28,12 @@ public class ITCustomClassLoaderAsyncMap extends VertxTestBase {
             RedisConfig.withAddress("redis", redis.getHost(), redis.getFirstMappedPort()),
             classLoader);
     return new VertxOptions().setClusterManager(clusterManager);
+  }
+
+  @Test
+  public void customObjectNotOnPath() {
+    assertThrows(
+        ClassNotFoundException.class, () -> Class.forName(CustomObjectClassLoader.CUSTOM_OBJECT));
   }
 
   @Test
