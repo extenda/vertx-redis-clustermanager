@@ -96,7 +96,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
    * Create a Redis cluster manager with specified configuration.
    *
    * @param config the redis configuration
-   * @param dataClassLoader lass loader used to restore keys and values returned from Redis
+   * @param dataClassLoader class loader used to restore keys and values returned from Redis
    */
   public RedisClusterManager(RedisConfig config, ClassLoader dataClassLoader) {
     Objects.requireNonNull(dataClassLoader);
