@@ -15,9 +15,7 @@ import org.redisson.client.protocol.Encoder;
 import org.redisson.codec.SerializationCodec;
 
 /** A general purpose Redisson Codec for types supported by shared data maps. */
-public class RedisMapCodec extends BaseCodec {
-
-  private ClassLoader classLoader;
+public class RedisMapCodec extends ClassLoaderCodec {
 
   private enum ValueCodec {
     // Enum is ordered according to codec priority
@@ -89,8 +87,7 @@ public class RedisMapCodec extends BaseCodec {
    * @param classLoader required by Codec contract
    */
   public RedisMapCodec(ClassLoader classLoader) {
-    this();
-    this.classLoader = classLoader;
+    super(classLoader);
   }
 
   /**
@@ -111,13 +108,5 @@ public class RedisMapCodec extends BaseCodec {
   @Override
   public Encoder getValueEncoder() {
     return encoder;
-  }
-
-  @Override
-  public ClassLoader getClassLoader() {
-    if (classLoader != null) {
-      return classLoader;
-    }
-    return super.getClassLoader();
   }
 }
