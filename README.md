@@ -13,7 +13,7 @@ The cluster manager is possible to use with
 ```xml
 
 <dependency>
-  <groupId>com.extendaretail</groupId>
+  <groupId>com.retailsvc</groupId>
   <artifactId>vertx-redis-clustermanager</artifactId>
   <version>VERSION</version>
 </dependency>
