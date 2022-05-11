@@ -11,23 +11,23 @@ public class RedisLock implements Lock {
 
   private final ExecutorService lockReleaseExec;
   private final AtomicBoolean released = new AtomicBoolean();
-  private final Runnable release;
+  private final Runnable releaseLock;
 
   public RedisLock(RSemaphore semaphore, ExecutorService lockReleaseExec) {
     this.lockReleaseExec = lockReleaseExec;
-    this.release = semaphore::release;
+    this.releaseLock = semaphore::release;
   }
 
   public RedisLock(
       RPermitExpirableSemaphore semaphore, String permitId, ExecutorService lockReleaseExec) {
     this.lockReleaseExec = lockReleaseExec;
-    this.release = () -> semaphore.release(permitId);
+    this.releaseLock = () -> semaphore.release(permitId);
   }
 
   @Override
   public void release() {
     if (released.compareAndSet(false, true)) {
-      lockReleaseExec.execute(this::release);
+      lockReleaseExec.execute(releaseLock);
     }
   }
 }
