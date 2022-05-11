@@ -22,6 +22,7 @@ import io.vertx.spi.cluster.redis.config.RedisConfig;
 import io.vertx.spi.cluster.redis.impl.NodeInfoCatalog;
 import io.vertx.spi.cluster.redis.impl.NodeInfoCatalogListener;
 import io.vertx.spi.cluster.redis.impl.RedisKeyFactory;
+import io.vertx.spi.cluster.redis.impl.RedissonRedisInstance;
 import io.vertx.spi.cluster.redis.impl.SubscriptionCatalog;
 import io.vertx.spi.cluster.redis.impl.codec.RedisMapCodec;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisAsyncMap;
@@ -42,7 +43,6 @@ import org.redisson.api.EvictionMode;
 import org.redisson.api.RMapCache;
 import org.redisson.api.RPermitExpirableSemaphore;
 import org.redisson.api.RedissonClient;
-import org.redisson.api.redisnode.RedisNodes;
 import org.redisson.config.Config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -376,25 +376,6 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
       return Optional.empty();
     }
     return Optional.of(new RedissonRedisInstance(redisson, config));
-  }
-
-  private static class RedissonRedisInstance implements RedisInstance {
-    private final RedissonClient redisson;
-    private final RedisConfig config;
-
-    private RedissonRedisInstance(RedissonClient redisson, RedisConfig config) {
-      this.redisson = redisson;
-      this.config = config;
-    }
-
-    @Override
-    public boolean ping() {
-      if (config.getClientType() == ClientType.STANDALONE) {
-        return redisson.getRedisNodes(RedisNodes.SINGLE).pingAll();
-      }
-      throw new IllegalStateException(
-          "Ping is not supported for client type: " + config.getClientType());
-    }
   }
 
   private static class SemaphoreTuple {

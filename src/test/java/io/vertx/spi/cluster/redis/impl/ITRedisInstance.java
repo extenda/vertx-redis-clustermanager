@@ -1,4 +1,4 @@
-package io.vertx.spi.cluster.redis;
+package io.vertx.spi.cluster.redis.impl;
 
 import static com.jayway.awaitility.Awaitility.await;
 import static java.util.Arrays.asList;
@@ -9,6 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
 import io.vertx.core.shareddata.AsyncMap;
+import io.vertx.spi.cluster.redis.RedisClusterManager;
+import io.vertx.spi.cluster.redis.RedisInstance;
+import io.vertx.spi.cluster.redis.RedisTestContainerFactory;
 import io.vertx.spi.cluster.redis.config.LockConfig;
 import io.vertx.spi.cluster.redis.config.MapConfig;
 import io.vertx.spi.cluster.redis.config.RedisConfig;
