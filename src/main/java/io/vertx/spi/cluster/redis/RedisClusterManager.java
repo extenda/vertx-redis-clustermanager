@@ -42,6 +42,7 @@ import org.redisson.Redisson;
 import org.redisson.api.EvictionMode;
 import org.redisson.api.RMapCache;
 import org.redisson.api.RPermitExpirableSemaphore;
+import org.redisson.api.RSemaphore;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
 import org.slf4j.Logger;
@@ -75,7 +76,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private ExecutorService lockReleaseExec;
 
   private final ConcurrentMap<String, AsyncMap<?, ?>> asyncMapCache = new ConcurrentHashMap<>();
-  private final ConcurrentMap<String, SemaphoreTuple> locksCache = new ConcurrentHashMap<>();
+  private final ConcurrentMap<String, SemaphoreWrapper> locksCache = new ConcurrentHashMap<>();
 
   /**
    * Create a Redis cluster manager with default configuration from system properties or environment
@@ -153,36 +154,41 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     return getMapCache(name);
   }
 
-  private SemaphoreTuple createSemaphore(String name) {
+  private SemaphoreWrapper createSemaphore(String name) {
     int leaseTime = config.getLockConfig(name).map(LockConfig::getLeaseTime).orElse(-1);
+    if (leaseTime == -1) {
+      log.debug("Create semaphore '{}'", name);
+      RSemaphore semaphore = redisson.getSemaphore(keyFactory.lock(name));
+      semaphore.trySetPermits(1);
+      return new SemaphoreWrapper(semaphore);
+    }
+
+    log.debug("Create semaphore '{}' with leaseTime={}", name, leaseTime);
     RPermitExpirableSemaphore semaphore =
         redisson.getPermitExpirableSemaphore(keyFactory.lock(name));
     semaphore.trySetPermits(1);
-    log.debug("Create semaphore '{}' with leaseTime={}", name, leaseTime);
-    return new SemaphoreTuple(semaphore, leaseTime);
+    return new SemaphoreWrapper(semaphore, leaseTime);
   }
 
   @Override
   public void getLockWithTimeout(String name, long timeout, Promise<Lock> promise) {
     vertx.executeBlocking(
         prom -> {
-          SemaphoreTuple tuple = locksCache.computeIfAbsent(name, this::createSemaphore);
-          String permitId;
-          boolean locked;
+          SemaphoreWrapper semaphore = locksCache.computeIfAbsent(name, this::createSemaphore);
+          RedisLock lock;
           long remaining = timeout;
           do {
             long start = System.nanoTime();
             try {
-              permitId = tuple.semaphore.tryAcquire(remaining, tuple.leaseTime, MILLISECONDS);
-              locked = permitId != null;
+              lock = semaphore.tryAcquire(remaining, lockReleaseExec);
             } catch (InterruptedException e) {
               Thread.currentThread().interrupt();
               throw new VertxException("Interrupted while waiting for lock.", e);
             }
             remaining = remaining - MILLISECONDS.convert(System.nanoTime() - start, NANOSECONDS);
-          } while (!locked && remaining > 0);
-          if (locked) {
-            prom.complete(new RedisLock(tuple.semaphore, permitId, lockReleaseExec));
+          } while (lock == null && remaining > 0);
+          if (lock != null) {
+            prom.complete(lock);
           } else {
             throw new VertxException("Timed out waiting to get lock " + name);
           }
@@ -378,13 +384,43 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     return Optional.of(new RedissonRedisInstance(redisson, config));
   }
 
-  private static class SemaphoreTuple {
-    final RPermitExpirableSemaphore semaphore;
-    final int leaseTime;
+  /** A redis semaphore wrapper that supports lock lease time when configured. */
+  private static class SemaphoreWrapper {
+    private RPermitExpirableSemaphore permitSemaphore;
+    private RSemaphore semaphore;
+    private int leaseTime;
 
-    private SemaphoreTuple(RPermitExpirableSemaphore semaphore, int leaseTime) {
+    private SemaphoreWrapper(RSemaphore semaphore) {
       this.semaphore = semaphore;
+    }
+
+    private SemaphoreWrapper(RPermitExpirableSemaphore semaphore, int leaseTime) {
+      this.permitSemaphore = semaphore;
       this.leaseTime = leaseTime;
+    }
+
+    /**
+     * Try to acquire a redis lock.
+     *
+     * @param waitTime max wait time in milliseconds
+     * @param lockReleaseExec lock release thread
+     * @return teh acquired lock or <code>null</code> if unsuccessful
+     * @throws InterruptedException if interrupted while waiting for lock
+     */
+    public RedisLock tryAcquire(long waitTime, ExecutorService lockReleaseExec)
+        throws InterruptedException {
+      RedisLock lock = null;
+      if (semaphore != null) {
+        if (semaphore.tryAcquire(waitTime, MILLISECONDS)) {
+          lock = new RedisLock(semaphore, lockReleaseExec);
+        }
+      } else {
+        String permitId = permitSemaphore.tryAcquire(waitTime, leaseTime, MILLISECONDS);
+        if (permitId != null) {
+          lock = new RedisLock(permitSemaphore, permitId, lockReleaseExec);
+        }
+      }
+      return lock;
     }
   }
 }
