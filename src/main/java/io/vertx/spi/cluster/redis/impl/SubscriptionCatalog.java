@@ -41,11 +41,12 @@ public class SubscriptionCatalog {
   private final ConcurrentMap<String, Set<RegistrationInfo>> ownSubs = new ConcurrentHashMap<>();
   private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
-  public SubscriptionCatalog(Vertx vertx, RedissonClient redisson, NodeSelector nodeSelector) {
+  public SubscriptionCatalog(
+      Vertx vertx, RedissonClient redisson, RedisKeyFactory keyFactory, NodeSelector nodeSelector) {
     this.vertx = vertx;
     this.nodeSelector = nodeSelector;
-    subsMap = redisson.getSetMultimap(RedisKeyFactory.INSTANCE.vertx("subs"));
-    topic = redisson.getTopic(RedisKeyFactory.INSTANCE.topic("subs"));
+    subsMap = redisson.getSetMultimap(keyFactory.vertx("subs"));
+    topic = redisson.getTopic(keyFactory.topic("subs"));
     listenerId = topic.addListener(String.class, this::onMessage);
   }
 

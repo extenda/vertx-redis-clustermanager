@@ -5,8 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.spi.cluster.redis.RedisClusterManager;
-import io.vertx.spi.cluster.redis.RedisConfig;
 import io.vertx.spi.cluster.redis.RedisTestContainerFactory;
+import io.vertx.spi.cluster.redis.config.RedisConfig;
 import io.vertx.spi.cluster.redis.impl.codec.CustomObjectClassLoader;
 import io.vertx.test.core.VertxTestBase;
 import org.junit.Rule;
@@ -22,8 +22,8 @@ public class ITCustomClassLoaderAsyncMap extends VertxTestBase {
 
   @Override
   protected ClusterManager getClusterManager() {
-    return new RedisClusterManager(
-        RedisConfig.withAddress("redis", redis.getHost(), redis.getFirstMappedPort()), classLoader);
+    String redisUrl = "redis://" + redis.getHost() + ":" + redis.getFirstMappedPort();
+    return new RedisClusterManager(new RedisConfig().addEndpoint(redisUrl), classLoader);
   }
 
   @Override

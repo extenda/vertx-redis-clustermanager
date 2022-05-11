@@ -1,4 +1,4 @@
-package io.vertx.spi.cluster.redis.impl;
+package io.vertx.spi.cluster.redis.config;
 
 import java.net.URI;
 import org.slf4j.Logger;
@@ -6,6 +6,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Utility to access configuration from system properties that fallback to environment variables.
+ *
+ * @author sasjo
  */
 final class RedisConfigProps {
 
@@ -23,7 +25,7 @@ final class RedisConfigProps {
    * @param propertyName the property name
    * @return the property value or <code>null</code> if not set
    */
-  public static String getPropertyValue(String propertyName) {
+  static String getPropertyValue(String propertyName) {
     String envName = propertyName.replace(".", "_").toUpperCase();
     return System.getProperty(propertyName, System.getenv(envName));
   }
@@ -35,17 +37,17 @@ final class RedisConfigProps {
    * @param defaultValue the default fallback value
    * @return the property value or the fallback value
    */
-  public static String getPropertyValue(String propertyName, String defaultValue) {
+  static String getPropertyValue(String propertyName, String defaultValue) {
     String value = getPropertyValue(propertyName);
     return value == null ? defaultValue : value;
   }
 
   /**
-   * Returns the Redis server address.
+   * Returns the Redis server default endpoint.
    *
-   * @return the configured Redis server address.
+   * @return the configured Redis server endpoint.
    */
-  static URI getServerAddress() {
+  static URI getDefaultEndpoint() {
     String scheme = getPropertyValue("redis.connection.scheme", "redis");
     String host = getPropertyValue("redis.connection.host", "127.0.0.1");
     String port = getPropertyValue("redis.connection.port", "6379");
@@ -53,7 +55,7 @@ final class RedisConfigProps {
     String defaultAddress = scheme + "://" + host + ":" + port;
     String address = getPropertyValue("redis.connection.address", defaultAddress);
 
-    log.debug("Redis address: [{}]", address);
+    log.debug("Redis endpoint: [{}]", address);
     return URI.create(address);
   }
 }
