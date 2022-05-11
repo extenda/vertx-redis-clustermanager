@@ -1,13 +1,10 @@
 package io.vertx.spi.cluster.redis;
 
 import static com.jayway.awaitility.Awaitility.await;
-import static io.vertx.core.Future.succeededFuture;
 import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
@@ -15,6 +12,8 @@ import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.spi.cluster.redis.config.LockConfig;
 import io.vertx.spi.cluster.redis.config.MapConfig;
 import io.vertx.spi.cluster.redis.config.RedisConfig;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -75,7 +74,7 @@ class ITRedisInstance {
         .getLockWithTimeout("forever", 1000)
         .onSuccess(
             lock -> {
-              assertEquals(1, claimCount.incrementAndGet());
+              claimCount.incrementAndGet();
             });
     await().atMost(2, TimeUnit.SECONDS).until(() -> claimCount.get() == 1);
 
@@ -83,10 +82,6 @@ class ITRedisInstance {
     vertx
         .sharedData()
         .getLockWithTimeout("forever", 1000)
-        .onSuccess(
-            lock -> {
-              fail("We don't expect to obtain a lock");
-            })
         .onFailure(
             t -> {
               lockTimeout.set(true);
@@ -105,7 +100,7 @@ class ITRedisInstance {
         .getLockWithTimeout("leaseTime", 1000)
         .onSuccess(
             lock -> {
-              assertEquals(1, claimCount.incrementAndGet());
+              claimCount.incrementAndGet();
             });
     await().atMost(2, TimeUnit.SECONDS).until(() -> claimCount.get() == 1);
 
@@ -115,7 +110,7 @@ class ITRedisInstance {
         .getLockWithTimeout("leaseTime", 4000)
         .onSuccess(
             lock -> {
-              assertEquals(2, claimCount.incrementAndGet());
+              claimCount.incrementAndGet();
               lock.release();
             });
 
@@ -125,6 +120,10 @@ class ITRedisInstance {
   @Test
   void mapMaxSize() throws Exception {
     AtomicBoolean completed = new AtomicBoolean(false);
+
+    List<String> values1 = new ArrayList<>();
+    List<String> values2 = new ArrayList<>();
+
     AsyncMap<String, String> map =
         vertx
             .sharedData()
@@ -136,31 +135,16 @@ class ITRedisInstance {
     map.put("1", "1")
         .compose(v -> map.put("2", "2"))
         .compose(v -> map.put("3", "3"))
-        .compose(
-            v -> {
-              map.values()
-                  .onSuccess(
-                      values -> {
-                        assertThat(values).hasSameElementsAs(asList("1", "2", "3"));
-                      });
-              return succeededFuture();
-            })
+        .compose(v -> map.values().onSuccess(values1::addAll))
         .compose(v -> map.put("4", "4"))
         .compose(v -> map.put("5", "5"))
-        .compose(
-            v -> {
-              map.values()
-                  .onSuccess(
-                      values -> {
-                        assertThat(values).hasSameElementsAs(asList("3", "4", "5"));
-                      });
-              return succeededFuture();
-            })
-        .onComplete(
-            res -> {
-              completed.set(true);
-            });
+        .compose(v -> map.values().onSuccess(values2::addAll))
+        .onSuccess(v -> completed.set(true));
+
     await().atMost(2, TimeUnit.SECONDS).until(completed::get);
+
+    assertThat(values1).hasSameElementsAs(asList("1", "2", "3"));
+    assertThat(values2).hasSameElementsAs(asList("3", "4", "5"));
   }
 
   @Test
