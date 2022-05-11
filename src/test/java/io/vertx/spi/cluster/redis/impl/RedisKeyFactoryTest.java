@@ -8,7 +8,7 @@ class RedisKeyFactoryTest {
 
   @Test
   void mapWithDefault() {
-    assertEquals("test", RedisKeyFactory.INSTANCE.map("test"));
+    assertEquals("test", new RedisKeyFactory("").map("test"));
   }
 
   @Test
@@ -18,7 +18,7 @@ class RedisKeyFactoryTest {
 
   @Test
   void lockWithDefault() {
-    assertEquals("__vertx:locks:test", RedisKeyFactory.INSTANCE.lock("test"));
+    assertEquals("__vertx:locks:test", new RedisKeyFactory("").lock("test"));
   }
 
   @Test
@@ -28,7 +28,7 @@ class RedisKeyFactoryTest {
 
   @Test
   void counterWithDefault() {
-    assertEquals("__vertx:counters:test", RedisKeyFactory.INSTANCE.counter("test"));
+    assertEquals("__vertx:counters:test", new RedisKeyFactory("").counter("test"));
   }
 
   @Test
@@ -39,7 +39,7 @@ class RedisKeyFactoryTest {
 
   @Test
   void topicWithDefault() {
-    assertEquals("__vertx:topics:test", RedisKeyFactory.INSTANCE.topic("test"));
+    assertEquals("__vertx:topics:test", new RedisKeyFactory("").topic("test"));
   }
 
   @Test
@@ -49,7 +49,7 @@ class RedisKeyFactoryTest {
 
   @Test
   void vertxWithDefault() {
-    assertEquals("__vertx:test", RedisKeyFactory.INSTANCE.vertx("test"));
+    assertEquals("__vertx:test", new RedisKeyFactory("").vertx("test"));
   }
 
   @Test

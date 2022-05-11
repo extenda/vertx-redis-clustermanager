@@ -16,17 +16,18 @@ import io.vertx.core.spi.cluster.NodeInfo;
 import io.vertx.core.spi.cluster.NodeListener;
 import io.vertx.core.spi.cluster.NodeSelector;
 import io.vertx.core.spi.cluster.RegistrationInfo;
+import io.vertx.spi.cluster.redis.config.ClientType;
+import io.vertx.spi.cluster.redis.config.LockConfig;
+import io.vertx.spi.cluster.redis.config.RedisConfig;
 import io.vertx.spi.cluster.redis.impl.NodeInfoCatalog;
 import io.vertx.spi.cluster.redis.impl.NodeInfoCatalogListener;
 import io.vertx.spi.cluster.redis.impl.RedisKeyFactory;
+import io.vertx.spi.cluster.redis.impl.RedissonRedisInstance;
 import io.vertx.spi.cluster.redis.impl.SubscriptionCatalog;
 import io.vertx.spi.cluster.redis.impl.codec.RedisMapCodec;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisAsyncMap;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisCounter;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisLock;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -38,11 +39,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.redisson.Redisson;
-import org.redisson.api.RLock;
+import org.redisson.api.EvictionMode;
 import org.redisson.api.RMapCache;
+import org.redisson.api.RPermitExpirableSemaphore;
 import org.redisson.api.RSemaphore;
 import org.redisson.api.RedissonClient;
-import org.redisson.api.redisnode.RedisNodes;
 import org.redisson.config.Config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +65,10 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   private final AtomicBoolean active = new AtomicBoolean();
 
+  private final RedisConfig config;
   private final Config redisConfig;
+
+  private final RedisKeyFactory keyFactory;
   private RedissonClient redisson;
 
   private NodeInfoCatalog nodeInfoCatalog;
@@ -72,15 +76,14 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private ExecutorService lockReleaseExec;
 
   private final ConcurrentMap<String, AsyncMap<?, ?>> asyncMapCache = new ConcurrentHashMap<>();
-  private final ConcurrentMap<String, RSemaphore> locksCache = new ConcurrentHashMap<>();
+  private final ConcurrentMap<String, SemaphoreWrapper> locksCache = new ConcurrentHashMap<>();
 
   /**
-   * Create a Redis cluster manager configured from system properties or environment variables.
-   *
-   * @see RedisConfig#withDefaults()
+   * Create a Redis cluster manager with default configuration from system properties or environment
+   * variables.
    */
   public RedisClusterManager() {
-    this(RedisConfig.withDefaults());
+    this(new RedisConfig());
   }
 
   /**
@@ -101,11 +104,19 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   public RedisClusterManager(RedisConfig config, ClassLoader dataClassLoader) {
     Objects.requireNonNull(dataClassLoader);
     redisConfig = new Config();
-    redisConfig.useSingleServer().setAddress(config.getServerAddress().toASCIIString());
+
+    if (config.getClientType() == ClientType.STANDALONE) {
+      redisConfig.useSingleServer().setAddress(config.getEndpoints().get(0));
+    } else {
+      throw new IllegalStateException("RedisClusterManager only supports STANDALONE client");
+    }
+
     redisConfig.setCodec(new RedisMapCodec(dataClassLoader));
     if (dataClassLoader != getClass().getClassLoader()) {
       redisConfig.setUseThreadClassLoader(false);
     }
+    keyFactory = new RedisKeyFactory(config.getKeyNamespace());
+    this.config = new RedisConfig(config);
   }
 
   @Override
@@ -115,7 +126,17 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   private <K, V> RMapCache<K, V> getMapCache(String name) {
-    return redisson.getMapCache(RedisKeyFactory.INSTANCE.map(name));
+    RMapCache<K, V> map = redisson.getMapCache(keyFactory.map(name));
+    log.debug("Create map '{}'", name);
+    config
+        .getMapConfig(name)
+        .ifPresent(
+            mapConfig -> {
+              log.debug("Configure map '{}' with {}", name, mapConfig);
+              map.setMaxSize(
+                  mapConfig.getMaxSize(), EvictionMode.valueOf(mapConfig.getEvictionMode().name()));
+            });
+    return map;
   }
 
   @Override
@@ -133,31 +154,41 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     return getMapCache(name);
   }
 
-  private RSemaphore createSemaphore(String name) {
-    RSemaphore semaphore = redisson.getSemaphore(RedisKeyFactory.INSTANCE.lock(name));
+  private SemaphoreWrapper createSemaphore(String name) {
+    int leaseTime = config.getLockConfig(name).map(LockConfig::getLeaseTime).orElse(-1);
+    if (leaseTime == -1) {
+      log.debug("Create semaphore '{}'", name);
+      RSemaphore semaphore = redisson.getSemaphore(keyFactory.lock(name));
+      semaphore.trySetPermits(1);
+      return new SemaphoreWrapper(semaphore);
+    }
+
+    log.debug("Create semaphore '{}' with leaseTime={}", name, leaseTime);
+    RPermitExpirableSemaphore semaphore =
+        redisson.getPermitExpirableSemaphore(keyFactory.lock(name));
     semaphore.trySetPermits(1);
-    return semaphore;
+    return new SemaphoreWrapper(semaphore, leaseTime);
   }
 
   @Override
   public void getLockWithTimeout(String name, long timeout, Promise<Lock> promise) {
     vertx.executeBlocking(
         prom -> {
-          RSemaphore semaphore = locksCache.computeIfAbsent(name, this::createSemaphore);
-          boolean locked;
+          SemaphoreWrapper semaphore = locksCache.computeIfAbsent(name, this::createSemaphore);
+          RedisLock lock;
           long remaining = timeout;
           do {
             long start = System.nanoTime();
             try {
-              locked = semaphore.tryAcquire(remaining, MILLISECONDS);
+              lock = semaphore.tryAcquire(remaining, lockReleaseExec);
             } catch (InterruptedException e) {
               Thread.currentThread().interrupt();
               throw new VertxException("Interrupted while waiting for lock.", e);
             }
             remaining = remaining - MILLISECONDS.convert(System.nanoTime() - start, NANOSECONDS);
-          } while (!locked && remaining > 0);
-          if (locked) {
-            prom.complete(new RedisLock(semaphore, lockReleaseExec));
+          } while (lock == null && remaining > 0);
+          if (lock != null) {
+            prom.complete(lock);
           } else {
             throw new VertxException("Timed out waiting to get lock " + name);
           }
@@ -168,8 +199,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public void getCounter(String name, Promise<Counter> promise) {
-    promise.complete(
-        new RedisCounter(vertx, redisson.getAtomicLong(RedisKeyFactory.INSTANCE.counter(name))));
+    promise.complete(new RedisCounter(vertx, redisson.getAtomicLong(keyFactory.counter(name))));
   }
 
   @Override
@@ -232,8 +262,10 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
                     r -> new Thread(r, "vertx-redis-service-release-lock-thread"));
 
             redisson = Redisson.create(redisConfig);
-            nodeInfoCatalog = new NodeInfoCatalog(vertx, redisson, nodeId.toString(), this);
-            subscriptionCatalog = new SubscriptionCatalog(vertx, redisson, nodeSelector);
+            nodeInfoCatalog =
+                new NodeInfoCatalog(vertx, redisson, keyFactory, nodeId.toString(), this);
+            subscriptionCatalog =
+                new SubscriptionCatalog(vertx, redisson, keyFactory, nodeSelector);
           } else {
             log.warn("Already activated, nodeId: {}", nodeId);
           }
@@ -349,37 +381,46 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     if (!isActive()) {
       return Optional.empty();
     }
-    return Optional.of(new RedissonRedisInstance(redisson));
+    return Optional.of(new RedissonRedisInstance(redisson, config));
   }
 
-  private static class RedissonRedisInstance implements RedisInstance {
-    private final RedissonClient redisson;
+  /** A redis semaphore wrapper that supports lock lease time when configured. */
+  private static class SemaphoreWrapper {
+    private RPermitExpirableSemaphore permitSemaphore;
+    private RSemaphore semaphore;
+    private int leaseTime;
 
-    private RedissonRedisInstance(RedissonClient redisson) {
-      this.redisson = redisson;
+    private SemaphoreWrapper(RSemaphore semaphore) {
+      this.semaphore = semaphore;
     }
 
-    @Override
-    public boolean ping() {
-      return redisson.getRedisNodes(RedisNodes.SINGLE).pingAll();
+    private SemaphoreWrapper(RPermitExpirableSemaphore semaphore, int leaseTime) {
+      this.permitSemaphore = semaphore;
+      this.leaseTime = leaseTime;
     }
 
-    private InvocationHandler signatureMatchingInvocationHandler(Object target) {
-      return (proxy, method, args) -> {
-        Method targetMethod =
-            target.getClass().getMethod(method.getName(), method.getParameterTypes());
-        return targetMethod.invoke(target, args);
-      };
-    }
-
-    @Override
-    public DistributedLock getLock(String name) {
-      RLock lock = redisson.getLock(RedisKeyFactory.INSTANCE.lock(name));
-      return (DistributedLock)
-          Proxy.newProxyInstance(
-              lock.getClass().getClassLoader(),
-              new Class<?>[] {DistributedLock.class},
-              signatureMatchingInvocationHandler(lock));
+    /**
+     * Try to acquire a redis lock.
+     *
+     * @param waitTime max wait time in milliseconds
+     * @param lockReleaseExec lock release thread
+     * @return teh acquired lock or <code>null</code> if unsuccessful
+     * @throws InterruptedException if interrupted while waiting for lock
+     */
+    public RedisLock tryAcquire(long waitTime, ExecutorService lockReleaseExec)
+        throws InterruptedException {
+      RedisLock lock = null;
+      if (semaphore != null) {
+        if (semaphore.tryAcquire(waitTime, MILLISECONDS)) {
+          lock = new RedisLock(semaphore, lockReleaseExec);
+        }
+      } else {
+        String permitId = permitSemaphore.tryAcquire(waitTime, leaseTime, MILLISECONDS);
+        if (permitId != null) {
+          lock = new RedisLock(permitSemaphore, permitId, lockReleaseExec);
+        }
+      }
+      return lock;
     }
   }
 }

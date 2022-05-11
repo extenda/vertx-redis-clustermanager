@@ -3,22 +3,11 @@ package io.vertx.spi.cluster.redis.impl;
 /** Create keys for Redis objects. */
 public class RedisKeyFactory {
 
-  public static final RedisKeyFactory INSTANCE = new RedisKeyFactory();
-
   private static final String VERTX = "__vertx";
   private static final String DELIMITER = ":";
 
   private final String namespace;
   private final boolean hasNamespace;
-
-  /**
-   * Create a key factory with the default namespace. The default namespace is loaded from the
-   * <code>redis.key.namespace</code> system property or the <code>REDIS_KEY_NAMESPACE</code> env
-   * var.
-   */
-  public RedisKeyFactory() {
-    this(RedisConfigProps.getPropertyValue("redis.key.namespace"));
-  }
 
   /**
    * Create a key name factory for a namespace prefix.
