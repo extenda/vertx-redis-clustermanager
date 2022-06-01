@@ -281,6 +281,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
       if (nodeListener != null) {
         nodeListener.nodeAdded(nodeId);
       }
+      log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
     }
   }
 
@@ -290,6 +291,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
       log.debug("Remove member [{}]", nodeId);
       subscriptionCatalog.removeAllForNodes(singleton(nodeId));
       nodeInfoCatalog.remove(nodeId);
+      log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
 
       // Register self again.
       nodeInfoCatalog.setNodeInfo(getNodeInfo());
