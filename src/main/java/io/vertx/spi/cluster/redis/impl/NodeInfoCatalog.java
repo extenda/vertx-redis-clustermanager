@@ -1,5 +1,7 @@
 package io.vertx.spi.cluster.redis.impl;
 
+import static java.util.stream.Collectors.joining;
+
 import io.vertx.core.Vertx;
 import io.vertx.core.spi.cluster.NodeInfo;
 import java.util.ArrayList;
@@ -89,5 +91,10 @@ public class NodeInfoCatalog {
   public void close() {
     listenerIds.forEach(nodeInfoMap::removeListener);
     vertx.cancelTimer(timerId);
+  }
+
+  @Override
+  public String toString() {
+    return nodeInfoMap.values().stream().map(NodeInfo::toString).collect(joining("\n"));
   }
 }
