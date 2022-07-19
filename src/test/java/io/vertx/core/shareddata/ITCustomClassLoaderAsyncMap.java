@@ -23,7 +23,7 @@ public class ITCustomClassLoaderAsyncMap extends VertxTestBase {
   @Override
   protected ClusterManager getClusterManager() {
     String redisUrl = "redis://" + redis.getHost() + ":" + redis.getFirstMappedPort();
-    return new RedisClusterManager(new RedisConfig().addEndpoint(redisUrl), classLoader);
+    return new RedisClusterManager(new RedisConfig().addEndpoint(redisUrl), classLoader, null);
   }
 
   @Override

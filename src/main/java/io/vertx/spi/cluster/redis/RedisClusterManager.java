@@ -28,6 +28,8 @@ import io.vertx.spi.cluster.redis.impl.codec.RedisMapCodec;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisAsyncMap;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisCounter;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisLock;
+import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -66,7 +68,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private final AtomicBoolean active = new AtomicBoolean();
 
   private final RedisConfig config;
-  private final Config redisConfig;
+  private Config redisConfig;
 
   private final RedisKeyFactory keyFactory;
   private RedissonClient redisson;
@@ -92,7 +94,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
    * @param config the redis configuration
    */
   public RedisClusterManager(RedisConfig config) {
-    this(config, RedisClusterManager.class.getClassLoader());
+    this(config, RedisClusterManager.class.getClassLoader(), null);
   }
 
   /**
@@ -101,9 +103,18 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
    * @param config the redis configuration
    * @param dataClassLoader class loader used to restore keys and values returned from Redis
    */
-  public RedisClusterManager(RedisConfig config, ClassLoader dataClassLoader) {
+  public RedisClusterManager(RedisConfig config, ClassLoader dataClassLoader, File configFile) {
     Objects.requireNonNull(dataClassLoader);
-    redisConfig = new Config();
+    if (configFile != null) {
+      try {
+        this.redisConfig = Config.fromYAML(configFile);
+      } catch (IOException e) {
+        log.error("Error reading redisson config. Will continue with default values", e);
+        redisConfig = new Config();
+      }
+    } else {
+      redisConfig = new Config();
+    }
 
     if (config.getClientType() == ClientType.STANDALONE) {
       redisConfig.useSingleServer().setAddress(config.getEndpoints().get(0));
