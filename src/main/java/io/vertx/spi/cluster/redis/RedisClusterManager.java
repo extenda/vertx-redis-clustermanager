@@ -30,6 +30,7 @@ import io.vertx.spi.cluster.redis.impl.shareddata.RedisCounter;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisLock;
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -94,28 +95,17 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
    * @param config the redis configuration
    */
   public RedisClusterManager(RedisConfig config) {
-    this(config, RedisClusterManager.class.getClassLoader(), null);
+    this(config, RedisClusterManager.class.getClassLoader());
   }
 
-  /**
-   * Create a Redis cluster manager with specified configuration.
-   *
-   * @param config the redis configuration
-   * @param dataClassLoader class loader used to restore keys and values returned from Redis
-   */
-  public RedisClusterManager(RedisConfig config, ClassLoader dataClassLoader, File configFile) {
-    Objects.requireNonNull(dataClassLoader);
-    if (configFile != null) {
-      try {
-        this.redisConfig = Config.fromYAML(configFile);
-      } catch (IOException e) {
-        log.error("Error reading redisson config. Will continue with default values", e);
-        redisConfig = new Config();
-      }
-    } else {
-      redisConfig = new Config();
-    }
+  public RedisClusterManager(RedisConfig config, ClassLoader dataClassLoader) {
+    this(config, dataClassLoader, new Config());
+  }
 
+  public RedisClusterManager(
+      RedisConfig config, ClassLoader dataClassLoader, Config redissonConfig) {
+    Objects.requireNonNull(dataClassLoader);
+    this.redisConfig = redissonConfig;
     if (config.getClientType() == ClientType.STANDALONE) {
       redisConfig.useSingleServer().setAddress(config.getEndpoints().get(0));
     } else {
@@ -128,6 +118,42 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     }
     keyFactory = new RedisKeyFactory(config.getKeyNamespace());
     this.config = new RedisConfig(config);
+  }
+
+  /**
+   * Create a Redis cluster manager with specified configuration.
+   *
+   * @param config the redis configuration
+   * @param dataClassLoader class loader used to restore keys and values returned from Redis
+   * @param yamlConfigFile a yaml file representation of {@link Config}.
+   */
+  public RedisClusterManager(RedisConfig config, ClassLoader dataClassLoader, File yamlConfigFile) {
+    this(config, dataClassLoader, getConfig(yamlConfigFile));
+  }
+
+  public RedisClusterManager(
+      RedisConfig config, ClassLoader dataClassLoader, URL redissonConfigUrl) {
+    this(config, dataClassLoader, getConfig(redissonConfigUrl));
+  }
+
+  private static Config getConfig(URL redissonConfigUrl) {
+    Config redissonConfig = new Config();
+    try {
+      redissonConfig = Config.fromYAML(redissonConfigUrl);
+    } catch (IOException e) {
+      log.error("Error reading redisson config. Will continue with default values", e);
+    }
+    return redissonConfig;
+  }
+
+  private static Config getConfig(File redissonConfigFile) {
+    Config redissonConfig = new Config();
+    try {
+      redissonConfig = Config.fromYAML(redissonConfigFile);
+    } catch (IOException e) {
+      log.error("Error reading redisson config. Will continue with default values", e);
+    }
+    return redissonConfig;
   }
 
   @Override
