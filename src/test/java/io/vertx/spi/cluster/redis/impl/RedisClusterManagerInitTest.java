@@ -15,7 +15,7 @@ import org.mockito.MockedStatic;
 import org.redisson.config.Config;
 
 /** Tests the RedisClusterManager creation using different redisson configuration file */
-class RedisClusterManagerInitTesting {
+class RedisClusterManagerInitTest {
 
   private static final int NETTY_THREADS = 64;
 
