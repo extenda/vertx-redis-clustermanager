@@ -234,6 +234,10 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
         promise);
   }
 
+  public Config getRedissonConfig() {
+    return this.redisConfig;
+  }
+
   @Override
   public void getCounter(String name, Promise<Counter> promise) {
     promise.complete(new RedisCounter(vertx, redisson.getAtomicLong(keyFactory.counter(name))));
