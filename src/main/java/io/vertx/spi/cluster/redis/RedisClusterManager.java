@@ -28,6 +28,9 @@ import io.vertx.spi.cluster.redis.impl.codec.RedisMapCodec;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisAsyncMap;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisCounter;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisLock;
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -66,7 +69,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private final AtomicBoolean active = new AtomicBoolean();
 
   private final RedisConfig config;
-  private final Config redisConfig;
+  private Config redisConfig;
 
   private final RedisKeyFactory keyFactory;
   private RedissonClient redisson;
@@ -102,9 +105,21 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
    * @param dataClassLoader class loader used to restore keys and values returned from Redis
    */
   public RedisClusterManager(RedisConfig config, ClassLoader dataClassLoader) {
-    Objects.requireNonNull(dataClassLoader);
-    redisConfig = new Config();
+    this(config, dataClassLoader, new Config());
+  }
 
+  /**
+   * Create a Redis cluster manager with specified configuration and a specified redisson
+   * configuration.
+   *
+   * @param config the redis configuration
+   * @param dataClassLoader class loader used to restore keys and values returned from Redis
+   * @param redissonConfig a redisson configuration.
+   */
+  public RedisClusterManager(
+      RedisConfig config, ClassLoader dataClassLoader, Config redissonConfig) {
+    Objects.requireNonNull(dataClassLoader);
+    this.redisConfig = redissonConfig;
     if (config.getClientType() == ClientType.STANDALONE) {
       redisConfig.useSingleServer().setAddress(config.getEndpoints().get(0));
     } else {
@@ -117,6 +132,76 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     }
     keyFactory = new RedisKeyFactory(config.getKeyNamespace());
     this.config = new RedisConfig(config);
+  }
+
+  /**
+   * Create a Redis cluster manager with specified configuration and specified redisson from an
+   * yaml.
+   *
+   * @param config the redis configuration
+   * @param dataClassLoader class loader used to restore keys and values returned from Redis
+   * @param yamlConfigFile a yaml file representation of {@link Config}.
+   */
+  public RedisClusterManager(RedisConfig config, ClassLoader dataClassLoader, File yamlConfigFile) {
+    this(config, dataClassLoader, getConfig(yamlConfigFile));
+  }
+
+  /**
+   * Create a Redis cluster manager with specified configuration.
+   *
+   * @param config the redis configuration
+   * @param dataClassLoader class loader used to restore keys and values returned from Redis
+   * @param redissonConfigUrl an URL to yaml file containing {@link Config}.
+   */
+  public RedisClusterManager(
+      RedisConfig config, ClassLoader dataClassLoader, URL redissonConfigUrl) {
+    this(config, dataClassLoader, getConfig(redissonConfigUrl));
+  }
+
+  /**
+   * Get a redisson config from a URL to a yaml file
+   *
+   * @param redissonConfigFile
+   * @return
+   */
+  private static Config getConfig(URL redissonConfigUrl) {
+    Config redissonConfig = new Config();
+    if (redissonConfigUrl == null) {
+      return redissonConfig;
+    }
+    try {
+      redissonConfig = Config.fromYAML(redissonConfigUrl);
+    } catch (IOException e) {
+      log.error(
+          "Error reading redisson config file"
+              + redissonConfigUrl.getFile()
+              + ". Will continue with default values",
+          e);
+    }
+    return redissonConfig;
+  }
+
+  /**
+   * Get a redisson config from a yaml file
+   *
+   * @param redissonConfigFile
+   * @return
+   */
+  private static Config getConfig(File redissonConfigFile) {
+    Config redissonConfig = new Config();
+    if (redissonConfigFile == null) {
+      return redissonConfig;
+    }
+    try {
+      redissonConfig = Config.fromYAML(redissonConfigFile);
+    } catch (IOException e) {
+      log.error(
+          "Error reading redisson config file "
+              + redissonConfigFile.getName()
+              + ". Will continue with default values",
+          e);
+    }
+    return redissonConfig;
   }
 
   @Override
@@ -195,6 +280,15 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
         },
         false,
         promise);
+  }
+
+  /**
+   * Introduced mainly to be used for testing purpose.
+   *
+   * @return redisson configuration
+   */
+  public Config getRedissonConfig() {
+    return this.redisConfig;
   }
 
   @Override
