@@ -98,10 +98,24 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     this(config, RedisClusterManager.class.getClassLoader());
   }
 
+  /**
+   * Create a Redis cluster manager with specified configuration.
+   *
+   * @param config the redis configuration
+   * @param dataClassLoader class loader used to restore keys and values returned from Redis
+   */
   public RedisClusterManager(RedisConfig config, ClassLoader dataClassLoader) {
     this(config, dataClassLoader, new Config());
   }
 
+  /**
+   * Create a Redis cluster manager with specified configuration and a specified redisson
+   * configuration.
+   *
+   * @param config the redis configuration
+   * @param dataClassLoader class loader used to restore keys and values returned from Redis
+   * @param redissonConfig a redisson configuration.
+   */
   public RedisClusterManager(
       RedisConfig config, ClassLoader dataClassLoader, Config redissonConfig) {
     Objects.requireNonNull(dataClassLoader);
@@ -121,7 +135,8 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   /**
-   * Create a Redis cluster manager with specified configuration.
+   * Create a Redis cluster manager with specified configuration and specified redisson from an
+   * yaml.
    *
    * @param config the redis configuration
    * @param dataClassLoader class loader used to restore keys and values returned from Redis
@@ -131,27 +146,60 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     this(config, dataClassLoader, getConfig(yamlConfigFile));
   }
 
+  /**
+   * Create a Redis cluster manager with specified configuration.
+   *
+   * @param config the redis configuration
+   * @param dataClassLoader class loader used to restore keys and values returned from Redis
+   * @param redissonConfigUrl an URL to yaml file containing {@link Config}.
+   */
   public RedisClusterManager(
       RedisConfig config, ClassLoader dataClassLoader, URL redissonConfigUrl) {
     this(config, dataClassLoader, getConfig(redissonConfigUrl));
   }
 
+  /**
+   * Get a redisson config from a URL to a yaml file
+   *
+   * @param redissonConfigFile
+   * @return
+   */
   private static Config getConfig(URL redissonConfigUrl) {
     Config redissonConfig = new Config();
+    if (redissonConfigUrl == null) {
+      return redissonConfig;
+    }
     try {
       redissonConfig = Config.fromYAML(redissonConfigUrl);
     } catch (IOException e) {
-      log.error("Error reading redisson config. Will continue with default values", e);
+      log.error(
+          "Error reading redisson config file"
+              + redissonConfigUrl.getFile()
+              + ". Will continue with default values",
+          e);
     }
     return redissonConfig;
   }
 
+  /**
+   * Get a redisson config from a yaml file
+   *
+   * @param redissonConfigFile
+   * @return
+   */
   private static Config getConfig(File redissonConfigFile) {
     Config redissonConfig = new Config();
+    if (redissonConfigFile == null) {
+      return redissonConfig;
+    }
     try {
       redissonConfig = Config.fromYAML(redissonConfigFile);
     } catch (IOException e) {
-      log.error("Error reading redisson config. Will continue with default values", e);
+      log.error(
+          "Error reading redisson config file "
+              + redissonConfigFile.getName()
+              + ". Will continue with default values",
+          e);
     }
     return redissonConfig;
   }
@@ -234,6 +282,11 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
         promise);
   }
 
+  /**
+   * Introduced mainly to be used for testing purpose.
+   *
+   * @return redisson configuration
+   */
   public Config getRedissonConfig() {
     return this.redisConfig;
   }
