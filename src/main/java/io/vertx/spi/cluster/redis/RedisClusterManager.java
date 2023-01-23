@@ -4,6 +4,8 @@ import static java.util.Collections.singleton;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
+import io.vertx.core.Future;
+import io.vertx.core.Handler;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxException;
@@ -38,8 +40,10 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import org.redisson.Redisson;
 import org.redisson.api.EvictionMode;
+import org.redisson.api.RAtomicLong;
 import org.redisson.api.RMapCache;
 import org.redisson.api.RPermitExpirableSemaphore;
 import org.redisson.api.RSemaphore;
@@ -140,13 +144,26 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   public <K, V> void getAsyncMap(String name, Promise<AsyncMap<K, V>> promise) {
-    @SuppressWarnings("unchecked")
-    AsyncMap<K, V> map =
-        (AsyncMap<K, V>)
-            asyncMapCache.computeIfAbsent(
-                name, key -> new RedisAsyncMap<>(vertx, getMapCache(key)));
-    promise.complete(map);
+    Future.<AsyncMap<K, V>>future(p -> p.complete((AsyncMap<K, V>) asyncMapCache.get(name)))
+        .compose(
+            v -> {
+              if (v != null) {
+                return Future.succeededFuture(v);
+              }
+              return vertx.executeBlocking(createMapCacheAsync(name));
+            })
+        .onComplete(promise);
+  }
+
+  @SuppressWarnings("unchecked")
+  private <K, V> Handler<Promise<AsyncMap<K, V>>> createMapCacheAsync(String name) {
+    return p -> {
+      Function<String, AsyncMap<K, V>> newMap = key -> new RedisAsyncMap<>(vertx, getMapCache(key));
+      AsyncMap<K, V> map = (AsyncMap<K, V>) asyncMapCache.computeIfAbsent(name, newMap);
+      p.complete(map);
+    };
   }
 
   @Override
@@ -199,7 +216,10 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public void getCounter(String name, Promise<Counter> promise) {
-    promise.complete(new RedisCounter(vertx, redisson.getAtomicLong(keyFactory.counter(name))));
+    vertx
+        .<RAtomicLong>executeBlocking(
+            p -> p.complete(redisson.getAtomicLong(keyFactory.counter(name))))
+        .map(counter -> new RedisCounter(vertx, counter));
   }
 
   @Override
