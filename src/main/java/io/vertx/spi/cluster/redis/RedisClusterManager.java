@@ -219,7 +219,8 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     vertx
         .<RAtomicLong>executeBlocking(
             p -> p.complete(redisson.getAtomicLong(keyFactory.counter(name))))
-        .map(counter -> new RedisCounter(vertx, counter));
+        .<Counter>map(counter -> new RedisCounter(vertx, counter))
+        .onComplete(promise);
   }
 
   @Override
