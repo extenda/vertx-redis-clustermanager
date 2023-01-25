@@ -260,15 +260,15 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
           if (active.compareAndSet(false, true)) {
             synchronized (this) {
               nodeId = UUID.randomUUID();
-            }
-            lockReleaseExec =
-                Executors.newCachedThreadPool(
-                    r -> new Thread(r, "vertx-redis-service-release-lock-thread"));
+              lockReleaseExec =
+                  Executors.newCachedThreadPool(
+                      r -> new Thread(r, "vertx-redis-service-release-lock-thread"));
 
-            redisson = Redisson.create(redisConfig);
-            nodeInfoCatalog =
-                new NodeInfoCatalog(vertx, redisson, keyFactory, nodeId.toString(), this);
-            subscriptionCatalog = new SubscriptionCatalog(redisson, keyFactory, nodeSelector);
+              redisson = Redisson.create(redisConfig);
+              nodeInfoCatalog =
+                  new NodeInfoCatalog(vertx, redisson, keyFactory, nodeId.toString(), this);
+              subscriptionCatalog = new SubscriptionCatalog(redisson, keyFactory, nodeSelector);
+            }
           } else {
             log.warn("Already activated, nodeId: {}", nodeId);
           }
@@ -319,8 +319,8 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
         prom -> {
           // We need this to be synchronized to prevent other calls from happening while leaving the
           // cluster, typically memberAdded and memberRemoved.
-          synchronized (RedisClusterManager.this) {
-            if (active.compareAndSet(true, false)) {
+          if (active.compareAndSet(true, false)) {
+            synchronized (RedisClusterManager.this) {
               try {
                 lockReleaseExec.shutdown();
 
@@ -337,11 +337,11 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
               } catch (Exception e) {
                 prom.fail(e);
               }
-            } else {
-              log.warn("Already deactivated, nodeId: {}", nodeId);
             }
-            prom.tryComplete();
+          } else {
+            log.warn("Already deactivated, nodeId: {}", nodeId);
           }
+          prom.tryComplete();
         },
         promise);
   }
