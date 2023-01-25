@@ -2,7 +2,6 @@ package io.vertx.spi.cluster.redis.impl;
 
 import static java.util.Collections.emptySet;
 
-import io.vertx.core.Vertx;
 import io.vertx.core.spi.cluster.NodeSelector;
 import io.vertx.core.spi.cluster.RegistrationInfo;
 import io.vertx.core.spi.cluster.RegistrationUpdateEvent;
@@ -31,7 +30,6 @@ public class SubscriptionCatalog {
 
   private static final Logger log = LoggerFactory.getLogger(SubscriptionCatalog.class);
 
-  private final Vertx vertx;
   private final RSetMultimap<String, RegistrationInfo> subsMap;
   private final NodeSelector nodeSelector;
   private final int listenerId;
@@ -40,14 +38,15 @@ public class SubscriptionCatalog {
   private final ConcurrentMap<String, Set<RegistrationInfo>> localSubs = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, Set<RegistrationInfo>> ownSubs = new ConcurrentHashMap<>();
   private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+  private final Throttling throttling;
 
   public SubscriptionCatalog(
-      Vertx vertx, RedissonClient redisson, RedisKeyFactory keyFactory, NodeSelector nodeSelector) {
-    this.vertx = vertx;
+      RedissonClient redisson, RedisKeyFactory keyFactory, NodeSelector nodeSelector) {
     this.nodeSelector = nodeSelector;
     subsMap = redisson.getSetMultimap(keyFactory.vertx("subs"));
     topic = redisson.getTopic(keyFactory.topic("subs"));
     listenerId = topic.addListener(String.class, this::onMessage);
+    throttling = new Throttling(this::getAndUpdate);
   }
 
   private void onMessage(CharSequence channel, String address) {
@@ -93,26 +92,32 @@ public class SubscriptionCatalog {
   }
 
   /**
+   * Get the updated registration information and notify the node selector. This method is throttled
+   * to not fire too often.
+   *
+   * @param address the modified address
+   * @see Throttling
+   */
+  private void getAndUpdate(String address) {
+    if (nodeSelector.wantsUpdatesFor(address)) {
+      List<RegistrationInfo> registrationInfos;
+      try {
+        registrationInfos = get(address);
+      } catch (Exception e) {
+        log.trace("A failure occurred while retrieving the updated registrations", e);
+        registrationInfos = Collections.emptyList();
+      }
+      nodeSelector.registrationsUpdated(new RegistrationUpdateEvent(address, registrationInfos));
+    }
+  }
+
+  /**
    * Fire a registration update event to the node selector.
    *
    * @param address the modified address
    */
   private void fireRegistrationUpdateEvent(String address) {
-    vertx.executeBlocking(
-        promise -> {
-          if (nodeSelector.wantsUpdatesFor(address)) {
-            List<RegistrationInfo> registrationInfos;
-            try {
-              registrationInfos = get(address);
-            } catch (Exception e) {
-              log.trace("A failure occurred while retrieving the updated registrations", e);
-              registrationInfos = Collections.emptyList();
-            }
-            nodeSelector.registrationsUpdated(
-                new RegistrationUpdateEvent(address, registrationInfos));
-          }
-          promise.complete();
-        });
+    throttling.onEvent(address);
   }
 
   private Set<RegistrationInfo> addToSet(
@@ -179,5 +184,6 @@ public class SubscriptionCatalog {
 
   public void close() {
     topic.removeListener(listenerId);
+    throttling.close();
   }
 }

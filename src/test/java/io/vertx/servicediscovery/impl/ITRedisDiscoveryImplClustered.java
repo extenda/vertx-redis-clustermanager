@@ -11,9 +11,12 @@ import io.vertx.servicediscovery.ServiceDiscoveryOptions;
 import io.vertx.spi.cluster.redis.RedisClusterManagerTestFactory;
 import io.vertx.spi.cluster.redis.RedisTestContainerFactory;
 import org.junit.Before;
+import org.junit.FixMethodOrder;
 import org.junit.Rule;
+import org.junit.runners.MethodSorters;
 import org.testcontainers.containers.GenericContainer;
 
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class ITRedisDiscoveryImplClustered extends DiscoveryImplTestBase {
   @Rule public GenericContainer<?> redis = RedisTestContainerFactory.newContainer();
 

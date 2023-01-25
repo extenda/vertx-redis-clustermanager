@@ -233,7 +233,9 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public NodeInfo getNodeInfo() {
-    return nodeInfo;
+    synchronized (this) {
+      return nodeInfo;
+    }
   }
 
   @Override
@@ -256,16 +258,17 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     vertx.executeBlocking(
         prom -> {
           if (active.compareAndSet(false, true)) {
-            nodeId = UUID.randomUUID();
-            lockReleaseExec =
-                Executors.newCachedThreadPool(
-                    r -> new Thread(r, "vertx-redis-service-release-lock-thread"));
+            synchronized (this) {
+              nodeId = UUID.randomUUID();
+              lockReleaseExec =
+                  Executors.newCachedThreadPool(
+                      r -> new Thread(r, "vertx-redis-service-release-lock-thread"));
 
-            redisson = Redisson.create(redisConfig);
-            nodeInfoCatalog =
-                new NodeInfoCatalog(vertx, redisson, keyFactory, nodeId.toString(), this);
-            subscriptionCatalog =
-                new SubscriptionCatalog(vertx, redisson, keyFactory, nodeSelector);
+              redisson = Redisson.create(redisConfig);
+              nodeInfoCatalog =
+                  new NodeInfoCatalog(vertx, redisson, keyFactory, nodeId.toString(), this);
+              subscriptionCatalog = new SubscriptionCatalog(redisson, keyFactory, nodeSelector);
+            }
           } else {
             log.warn("Already activated, nodeId: {}", nodeId);
           }
@@ -275,7 +278,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   @Override
-  public void memberAdded(String nodeId) {
+  public synchronized void memberAdded(String nodeId) {
     if (isActive()) {
       log.debug("Add member [{}]", nodeId);
       if (nodeListener != null) {
@@ -286,7 +289,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   @Override
-  public void memberRemoved(String nodeId) {
+  public synchronized void memberRemoved(String nodeId) {
     if (isActive()) {
       log.debug("Remove member [{}]", nodeId);
       subscriptionCatalog.removeAllForNodes(singleton(nodeId));
@@ -314,27 +317,31 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   public void leave(Promise<Void> promise) {
     vertx.executeBlocking(
         prom -> {
+          // We need this to be synchronized to prevent other calls from happening while leaving the
+          // cluster, typically memberAdded and memberRemoved.
           if (active.compareAndSet(true, false)) {
-            try {
-              lockReleaseExec.shutdown();
+            synchronized (RedisClusterManager.this) {
+              try {
+                lockReleaseExec.shutdown();
 
-              // Stop catalog services.
-              subscriptionCatalog.close();
-              nodeInfoCatalog.close();
+                // Stop catalog services.
+                subscriptionCatalog.close();
+                nodeInfoCatalog.close();
 
-              // Remove self from cluster.
-              subscriptionCatalog.removeAllForNodes(singleton(nodeId.toString()));
-              nodeInfoCatalog.remove(nodeId.toString());
+                // Remove self from cluster.
+                subscriptionCatalog.removeAllForNodes(singleton(nodeId.toString()));
+                nodeInfoCatalog.remove(nodeId.toString());
 
-              redisson.shutdown();
-              redisson = null;
-            } catch (Exception e) {
-              prom.fail(e);
+                redisson.shutdown();
+                redisson = null;
+              } catch (Exception e) {
+                prom.fail(e);
+              }
             }
           } else {
             log.warn("Already deactivated, nodeId: {}", nodeId);
           }
-          prom.complete();
+          prom.tryComplete();
         },
         promise);
   }

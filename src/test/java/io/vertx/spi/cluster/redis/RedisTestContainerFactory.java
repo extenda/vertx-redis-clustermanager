@@ -5,6 +5,8 @@ import org.testcontainers.utility.DockerImageName;
 
 public class RedisTestContainerFactory {
   public static GenericContainer<?> newContainer() {
-    return new GenericContainer<>(DockerImageName.parse("redis:6-alpine")).withExposedPorts(6379);
+    return new GenericContainer<>(DockerImageName.parse("redis:6-alpine"))
+        .withCommand("redis-server", "--save", "''")
+        .withExposedPorts(6379);
   }
 }
