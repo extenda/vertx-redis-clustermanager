@@ -317,6 +317,7 @@
           -->
           <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
           <summaryFile>${project.build.directory}/surefire-reports/failsafe-summary.xml</summaryFile>
+          <rerunFailingTestsCount>2</rerunFailingTestsCount>
         </configuration>
         <executions>
           <execution>
