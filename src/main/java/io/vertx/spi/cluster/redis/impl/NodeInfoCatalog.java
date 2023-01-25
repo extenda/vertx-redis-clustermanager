@@ -6,6 +6,8 @@ import io.vertx.core.Vertx;
 import io.vertx.core.spi.cluster.NodeInfo;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
@@ -24,6 +26,8 @@ public class NodeInfoCatalog {
   private final String nodeId;
   private final List<Integer> listenerIds = new ArrayList<>();
   private final long timerId;
+  private final ExecutorService executor =
+      Executors.newSingleThreadExecutor(r -> new Thread(r, "vertx-redis-nodeInfo-thread"));
 
   public NodeInfoCatalog(
       Vertx vertx,
@@ -37,11 +41,11 @@ public class NodeInfoCatalog {
 
     // These listeners will detect map modifications from other nodes.
     EntryCreatedListener<String, NodeInfo> entryCreated =
-        event -> listener.memberAdded(event.getKey());
+        event -> executor.submit(() -> listener.memberAdded(event.getKey()));
     EntryRemovedListener<String, NodeInfo> entryRemoved =
-        event -> listener.memberRemoved(event.getKey());
+        event -> executor.submit(() -> listener.memberRemoved(event.getKey()));
     EntryExpiredListener<String, NodeInfo> entryExpired =
-        event -> listener.memberRemoved(event.getKey());
+        event -> executor.submit(() -> listener.memberRemoved(event.getKey()));
 
     listenerIds.add(nodeInfoMap.addListener(entryCreated));
     listenerIds.add(nodeInfoMap.addListener(entryRemoved));
