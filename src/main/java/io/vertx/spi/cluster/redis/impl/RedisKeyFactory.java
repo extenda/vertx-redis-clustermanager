@@ -19,7 +19,7 @@ public class RedisKeyFactory {
     this.hasNamespace = namespace != null && !namespace.isEmpty();
   }
 
-  private String build(String... path) {
+  String build(String... path) {
     String name = String.join(DELIMITER, path);
     return hasNamespace ? namespace + DELIMITER + name : name;
   }

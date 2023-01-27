@@ -390,7 +390,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     if (!isActive()) {
       return Optional.empty();
     }
-    return Optional.of(new RedissonRedisInstance(redisson, config));
+    return Optional.of(new RedissonRedisInstance(redisson, config, keyFactory));
   }
 
   /** A redis semaphore wrapper that supports lock lease time when configured. */
