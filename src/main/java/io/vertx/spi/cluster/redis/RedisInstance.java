@@ -16,13 +16,13 @@ import java.util.concurrent.BlockingQueue;
 public interface RedisInstance {
 
   /**
-   * Returns the Redis instance from the {@link RedisClusterManager}. If Vertx is not using the
-   * Redis cluster manager an empty optional will be returned.
+   * Create a Redis instance from the {@link RedisClusterManager}. If Vertx is not using the Redis
+   * cluster manager an empty optional will be returned.
    *
    * @param vertx the vertx instance
    * @return an optional with the Redis instance.
    */
-  static Optional<RedisInstance> getInstance(Vertx vertx) {
+  static Optional<RedisInstance> create(Vertx vertx) {
     if (vertx instanceof VertxInternal) {
       ClusterManager clusterManager = ((VertxInternal) vertx).getClusterManager();
       if (clusterManager instanceof RedisClusterManager) {
@@ -51,7 +51,7 @@ public interface RedisInstance {
   /**
    * Returns an unbounded blocking deque backed by Redis.
    *
-   * @param <V> tyep of value
+   * @param <V> type of value
    * @param name name of the deque
    * @return a blocking deque instance.
    */

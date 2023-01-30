@@ -70,13 +70,13 @@ class ITRedisInstance {
   }
 
   @Test
-  void getRedisInstanceFromInterface() {
-    assertTrue(RedisInstance.getInstance(vertx).isPresent());
+  void createFromInterface() {
+    assertTrue(RedisInstance.create(vertx).isPresent());
   }
 
   @Test
-  void getEmptyRedisInstanceFromInterface() {
-    assertFalse(RedisInstance.getInstance(null).isPresent());
+  void createEmptyFromInterface() {
+    assertFalse(RedisInstance.create(null).isPresent());
   }
 
   @Test
