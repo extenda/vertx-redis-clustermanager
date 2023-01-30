@@ -4,6 +4,7 @@ import static com.jayway.awaitility.Awaitility.await;
 import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.vertx.core.Vertx;
@@ -17,6 +18,8 @@ import io.vertx.spi.cluster.redis.config.MapConfig;
 import io.vertx.spi.cluster.redis.config.RedisConfig;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -64,6 +67,16 @@ class ITRedisInstance {
   void getRedisInstance() {
     assertTrue(clusterManager.isActive());
     assertTrue(clusterManager.getRedisInstance().isPresent());
+  }
+
+  @Test
+  void createFromInterface() {
+    assertTrue(RedisInstance.create(vertx).isPresent());
+  }
+
+  @Test
+  void createEmptyFromInterface() {
+    assertFalse(RedisInstance.create(null).isPresent());
   }
 
   @Test
@@ -150,10 +163,34 @@ class ITRedisInstance {
     assertThat(values2).hasSameElementsAs(asList("3", "4", "5"));
   }
 
+  private RedisInstance redisInstance() {
+    return clusterManager.getRedisInstance().orElseThrow(IllegalStateException::new);
+  }
+
   @Test
   void ping() {
-    RedisInstance redisInstance =
-        clusterManager.getRedisInstance().orElseThrow(IllegalStateException::new);
-    assertTrue(redisInstance.ping());
+    assertTrue(redisInstance().ping());
+  }
+
+  @Test
+  void blockingQueue() throws InterruptedException {
+    BlockingQueue<String> queue = redisInstance().getBlockingQueue("testQueue");
+    assertNotNull(queue);
+    queue.add("1");
+    queue.add("2");
+
+    assertThat(queue.take()).isEqualTo("1");
+    assertThat(queue.take()).isEqualTo("2");
+  }
+
+  @Test
+  void blockingDeque() {
+    BlockingDeque<String> deque = redisInstance().getBlockingDeque("testDeque");
+    assertNotNull(deque);
+    deque.push("1");
+    deque.push("2");
+
+    assertThat(deque.pop()).isEqualTo("2");
+    assertThat(deque.pop()).isEqualTo("1");
   }
 }
