@@ -24,15 +24,15 @@ public class RedisKeyFactory {
     return hasNamespace ? namespace + DELIMITER + name : name;
   }
 
-  public String map(String name) {
+  String map(String name) {
     return build(name);
   }
 
-  public String lock(String name) {
+  String lock(String name) {
     return build(VERTX, "locks", name);
   }
 
-  public String counter(String name) {
+  String counter(String name) {
     return build(VERTX, "counters", name);
   }
 

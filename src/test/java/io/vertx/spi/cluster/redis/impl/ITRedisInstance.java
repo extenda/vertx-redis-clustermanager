@@ -3,16 +3,24 @@ package io.vertx.spi.cluster.redis.impl;
 import static com.jayway.awaitility.Awaitility.await;
 import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.jayway.awaitility.Duration;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
 import io.vertx.core.shareddata.AsyncMap;
+import io.vertx.core.shareddata.Counter;
 import io.vertx.spi.cluster.redis.RedisClusterManager;
+import io.vertx.spi.cluster.redis.RedisDataGrid;
 import io.vertx.spi.cluster.redis.RedisInstance;
 import io.vertx.spi.cluster.redis.RedisTestContainerFactory;
+import io.vertx.spi.cluster.redis.Topic;
+import io.vertx.spi.cluster.redis.TopicSubscriber;
 import io.vertx.spi.cluster.redis.config.LockConfig;
 import io.vertx.spi.cluster.redis.config.MapConfig;
 import io.vertx.spi.cluster.redis.config.RedisConfig;
@@ -20,6 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,16 +47,17 @@ class ITRedisInstance {
 
   private Vertx vertx;
   private RedisClusterManager clusterManager;
+  private RedisConfig config;
 
   @BeforeEach
   void beforeEach() {
     String redisUrl = "redis://" + redis.getHost() + ":" + redis.getFirstMappedPort();
-    clusterManager =
-        new RedisClusterManager(
-            new RedisConfig()
-                .addEndpoint(redisUrl)
-                .addMap(new MapConfig("maxSize").setMaxSize(3))
-                .addLock(new LockConfig("leaseTime").setLeaseTime(1000)));
+    config =
+        new RedisConfig()
+            .addEndpoint(redisUrl)
+            .addMap(new MapConfig("maxSize").setMaxSize(3))
+            .addLock(new LockConfig("leaseTime").setLeaseTime(1000));
+    clusterManager = new RedisClusterManager(config);
     VertxOptions options = new VertxOptions().setClusterManager(clusterManager);
     Vertx.clusteredVertx(
         options,
@@ -80,6 +91,19 @@ class ITRedisInstance {
   }
 
   @Test
+  void getLock() {
+    AtomicInteger claimCount = new AtomicInteger(0);
+    redisInstance()
+        .getLock("getLock")
+        .onSuccess(
+            lock -> {
+              claimCount.incrementAndGet();
+              lock.release();
+            });
+    await().atMost(2, TimeUnit.SECONDS).until(() -> assertEquals(1, claimCount.get()));
+  }
+
+  @Test
   void lockWithoutLeaseTime() {
     AtomicInteger claimCount = new AtomicInteger(0);
     AtomicBoolean lockTimeout = new AtomicBoolean(false);
@@ -88,11 +112,8 @@ class ITRedisInstance {
     vertx
         .sharedData()
         .getLockWithTimeout("forever", 1000)
-        .onSuccess(
-            lock -> {
-              claimCount.incrementAndGet();
-            });
-    await().atMost(2, TimeUnit.SECONDS).until(() -> claimCount.get() == 1);
+        .onSuccess(lock -> claimCount.incrementAndGet());
+    await().atMost(2, TimeUnit.SECONDS).until(() -> assertEquals(1, claimCount.get()));
 
     // Try to claim the same lock. It should work after lease time expires.
     vertx
@@ -118,7 +139,7 @@ class ITRedisInstance {
             lock -> {
               claimCount.incrementAndGet();
             });
-    await().atMost(2, TimeUnit.SECONDS).until(() -> claimCount.get() == 1);
+    await().atMost(2, TimeUnit.SECONDS).until(() -> assertEquals(1, claimCount.get()));
 
     // Try to claim the same lock. It should work after lease time expires.
     vertx
@@ -130,7 +151,7 @@ class ITRedisInstance {
               lock.release();
             });
 
-    await().atMost(2, TimeUnit.SECONDS).until(() -> claimCount.get() == 2);
+    await().atMost(2, TimeUnit.SECONDS).until(() -> assertEquals(2, claimCount.get()));
   }
 
   @Test
@@ -192,5 +213,47 @@ class ITRedisInstance {
 
     assertThat(deque.pop()).isEqualTo("2");
     assertThat(deque.pop()).isEqualTo("1");
+  }
+
+  @Test
+  void topicWithSubscription() {
+    Topic<String> topic = redisInstance().getTopic(String.class, "testTopic");
+    List<String> messages = new CopyOnWriteArrayList<>();
+    List<Long> receivedBy = new ArrayList<>();
+    TopicSubscriber<String> subscriber = messages::add;
+
+    AtomicBoolean completed = new AtomicBoolean(false);
+    topic
+        .subscribe(subscriber)
+        .compose(v -> topic.publish("Hello"))
+        .onSuccess(receivedBy::add)
+        .compose(v -> topic.publish("World"))
+        .onSuccess(receivedBy::add)
+        .compose(v -> topic.unsubscribe(subscriber))
+        .compose(v -> topic.publish("Void"))
+        .onSuccess(receivedBy::add)
+        .onComplete(v -> completed.set(true));
+
+    await().atMost(2, TimeUnit.SECONDS).until(completed::get);
+
+    assertThat(messages).isNotEmpty().containsOnly("Hello", "World");
+    assertThat(receivedBy).isEqualTo(asList(1L, 1L, 0L));
+  }
+
+  @Test
+  void shutdownDataGrid() {
+    RedisDataGrid dataGrid = RedisDataGrid.create(vertx, config);
+    Counter c = assertDoesNotThrow(() -> dataGrid.getCounter("test"));
+
+    assertDoesNotThrow(() -> c.incrementAndGet().toCompletionStage().toCompletableFuture().get());
+
+    assertDoesNotThrow(dataGrid::shutdown);
+    await("Graceful shutdown").timeout(Duration.ONE_SECOND);
+
+    ExecutionException ex =
+        assertThrows(
+            ExecutionException.class,
+            () -> c.get().toCompletionStage().toCompletableFuture().get());
+    assertThat(ex).hasMessageContaining("Redisson is shutdown");
   }
 }
