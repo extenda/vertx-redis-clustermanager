@@ -45,7 +45,7 @@ public final class RedissonRedisInstance implements RedisInstance {
   private final RedisConfig config;
   private final RedisKeyFactory keyFactory;
   private final RedissonContext redissonContext;
-  private RedissonClient redisson;
+  private final RedissonClient redisson;
 
   /**
    * Create a new instance.
