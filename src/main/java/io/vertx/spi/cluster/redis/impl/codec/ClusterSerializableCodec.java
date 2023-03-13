@@ -3,7 +3,7 @@ package io.vertx.spi.cluster.redis.impl.codec;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.vertx.core.buffer.Buffer;
-import io.vertx.core.shareddata.ClusterSerializable;
+import io.vertx.core.shareddata.impl.ClusterSerializable;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
