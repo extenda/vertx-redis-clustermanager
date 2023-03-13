@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.redisson.api.RedissonClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -163,16 +164,12 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
               nodeId = UUID.randomUUID();
 
               dataGrid = new RedissonRedisInstance(vertx, redissonContext);
+              RedissonClient redisson = redissonContext.client();
               nodeInfoCatalog =
                   new NodeInfoCatalog(
-                      vertx,
-                      redissonContext.client(),
-                      redissonContext.keyFactory(),
-                      nodeId.toString(),
-                      this);
+                      vertx, redisson, redissonContext.keyFactory(), nodeId.toString(), this);
               subscriptionCatalog =
-                  new SubscriptionCatalog(
-                      redissonContext.client(), redissonContext.keyFactory(), nodeSelector);
+                  new SubscriptionCatalog(redisson, redissonContext.keyFactory(), nodeSelector);
             }
           } else {
             log.warn("Already activated, nodeId: {}", nodeId);
