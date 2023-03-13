@@ -4,8 +4,6 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.spi.cluster.redis.Topic;
 import io.vertx.spi.cluster.redis.TopicSubscriber;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.redisson.api.RTopic;
 
 /**
@@ -18,7 +16,6 @@ class RedisTopic<T> implements Topic<T> {
   private final Vertx vertx;
   private final RTopic topic;
   private final Class<T> type;
-  private final Map<TopicSubscriber<T>, Integer> subscribers = new ConcurrentHashMap<>();
 
   RedisTopic(Vertx vertx, Class<T> type, RTopic topic) {
     this.vertx = vertx;
@@ -27,21 +24,16 @@ class RedisTopic<T> implements Topic<T> {
   }
 
   @Override
-  public Future<Void> subscribe(TopicSubscriber<T> subscriber) {
+  public Future<Integer> subscribe(TopicSubscriber<T> subscriber) {
     return Future.fromCompletionStage(
-            topic.addListenerAsync(type, (channel, message) -> subscriber.onMessage(message)),
-            vertx.getOrCreateContext())
-        .onSuccess(id -> subscribers.put(subscriber, id))
-        .mapEmpty();
+        topic.addListenerAsync(type, (channel, message) -> subscriber.onMessage(message)),
+        vertx.getOrCreateContext());
   }
 
   @Override
-  public Future<Void> unsubscribe(TopicSubscriber<T> subscriber) {
-    Integer id = subscribers.get(subscriber);
-    if (id == null) {
-      return Future.succeededFuture();
-    }
-    return Future.fromCompletionStage(topic.removeListenerAsync(id), vertx.getOrCreateContext());
+  public Future<Void> unsubscribe(int subscriberId) {
+    return Future.fromCompletionStage(
+        topic.removeListenerAsync(subscriberId), vertx.getOrCreateContext());
   }
 
   @Override

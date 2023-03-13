@@ -222,14 +222,16 @@ class ITRedisInstance {
     List<Long> receivedBy = new ArrayList<>();
     TopicSubscriber<String> subscriber = messages::add;
 
+    AtomicInteger id = new AtomicInteger();
     AtomicBoolean completed = new AtomicBoolean(false);
     topic
         .subscribe(subscriber)
+        .onSuccess(id::set)
         .compose(v -> topic.publish("Hello"))
         .onSuccess(receivedBy::add)
         .compose(v -> topic.publish("World"))
         .onSuccess(receivedBy::add)
-        .compose(v -> topic.unsubscribe(subscriber))
+        .compose(v -> topic.unsubscribe(id.get()))
         .compose(v -> topic.publish("Void"))
         .onSuccess(receivedBy::add)
         .onComplete(v -> completed.set(true));

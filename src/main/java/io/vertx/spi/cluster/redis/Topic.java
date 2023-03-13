@@ -11,20 +11,21 @@ import io.vertx.core.Future;
  */
 public interface Topic<T> {
   /**
-   * Add a subscription to the topic.
+   * Add a subscription to the topic. The returned subscriber ID can be used to unsubscribe from the
+   * topic.
    *
    * @param subscriber the subscriber callback
-   * @return a future that completes when the subscriber is registered
+   * @return a future with the subscriber ID. The future completes when the subscriber is registered
    */
-  Future<Void> subscribe(TopicSubscriber<T> subscriber);
+  Future<Integer> subscribe(TopicSubscriber<T> subscriber);
 
   /**
    * Remove a subscription from the topic. If the subscriber isn't known this becomes a no-op.
    *
-   * @param subscriber the subscriber to remove
+   * @param subscriberId the subscriber ID to remove
    * @return a future that completes when the subscriber is unregistered
    */
-  Future<Void> unsubscribe(TopicSubscriber<T> subscriber);
+  Future<Void> unsubscribe(int subscriberId);
 
   /**
    * Publish a message to the topic. All subscribers from all processes will be notified.
