@@ -68,7 +68,7 @@
       <dependency>
         <groupId>io.vertx</groupId>
         <artifactId>vertx-stack-depchain</artifactId>
-        <version>4.3.4</version>
+        <version>4.4.1</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -82,7 +82,7 @@
       <dependency>
         <groupId>org.testcontainers</groupId>
         <artifactId>testcontainers-bom</artifactId>
-        <version>1.17.5</version>
+        <version>1.18.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -90,6 +90,18 @@
         <groupId>com.google.code.findbugs</groupId>
         <artifactId>jsr305</artifactId>
         <version>3.0.2</version>
+      </dependency>
+      <dependency>
+        <!-- http-client vs. guava -->
+        <groupId>com.google.errorprone</groupId>
+        <artifactId>error_prone_annotations</artifactId>
+        <version>2.18.0</version>
+      </dependency>
+      <dependency>
+        <!-- Testcontainers internal convergence -->
+        <groupId>com.google.http-client</groupId>
+        <artifactId>google-http-client</artifactId>
+        <version>1.43.1</version>
       </dependency>
       <dependency>
         <groupId>com.jayway.awaitility</groupId>
@@ -102,10 +114,28 @@
         <version>4.13.1</version>
       </dependency>
       <dependency>
-        <!-- Converge for log4j-core vs. commons-compress -->
-        <groupId>org.osgi</groupId>
-        <artifactId>org.osgi.core</artifactId>
-        <version>6.0.0</version>
+        <!-- testcontainers vs. jib (internal converge) -->
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-compress</artifactId>
+        <version>1.22</version>
+      </dependency>
+      <dependency>
+        <!-- Internal testcontainers and jib-core -->
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpclient</artifactId>
+        <version>4.5.14</version>
+      </dependency>
+      <dependency>
+        <!-- google-http-client internals -->
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpcore</artifactId>
+        <version>4.4.16</version>
+      </dependency>
+      <dependency>
+        <!-- redisson vs awaitility -->
+        <groupId>org.objenesis</groupId>
+        <artifactId>objenesis</artifactId>
+        <version>3.3</version>
       </dependency>
       <dependency>
         <groupId>org.reactivestreams</groupId>
@@ -115,12 +145,18 @@
       <dependency>
         <groupId>org.redisson</groupId>
         <artifactId>redisson</artifactId>
-        <version>3.17.7</version>
+        <version>3.20.1</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
         <version>1.7.35</version>
+      </dependency>
+      <dependency>
+        <!-- Redisson internals -->
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-core</artifactId>
+        <version>6.0.6</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
