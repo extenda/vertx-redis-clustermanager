@@ -170,6 +170,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
                       vertx, redisson, redissonContext.keyFactory(), nodeId.toString(), this);
               subscriptionCatalog =
                   new SubscriptionCatalog(redisson, redissonContext.keyFactory(), nodeSelector);
+              subscriptionCatalog.removeUnknownSubs(nodeId.toString(), nodeInfoCatalog.getNodes());
             }
           } else {
             log.warn("Already activated, nodeId: {}", nodeId);

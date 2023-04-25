@@ -6,6 +6,7 @@ import io.vertx.core.spi.cluster.NodeSelector;
 import io.vertx.core.spi.cluster.RegistrationInfo;
 import io.vertx.core.spi.cluster.RegistrationUpdateEvent;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -150,6 +151,11 @@ public class SubscriptionCatalog {
     return value.isEmpty() ? null : value;
   }
 
+  /**
+   * Remove subscriptions for all nodes in the passed set.
+   *
+   * @param nodeIds a set of nodes for which to remove subscriptions
+   */
   public void removeAllForNodes(Set<String> nodeIds) {
     Set<String> updated = new HashSet<>();
     subsMap
@@ -157,6 +163,37 @@ public class SubscriptionCatalog {
         .forEach(
             entry -> {
               if (nodeIds.contains(entry.getValue().nodeId())) {
+                subsMap.remove(entry.getKey(), entry.getValue());
+                updated.add(entry.getKey());
+              }
+            });
+    updated.forEach(topic::publish);
+  }
+
+  /**
+   * Remove subscriptions for nodes that are not part of the <code>availableNodeIds</code>
+   * collection. Own subscriptions are never removed.
+   *
+   * <p>Unknown nodes with lingering state can observed in clusters that has scaled down to one and
+   * then crashes. If a new node is not available to receive events when node entries expire in
+   * Redis, the subscriptions will remain registered in Redis.
+   *
+   * @param self the node ID of this process
+   * @param availableNodeIds a set of available nodes
+   */
+  public void removeUnknownSubs(String self, Collection<String> availableNodeIds) {
+    Set<String> known = new HashSet<>(availableNodeIds);
+    known.add(self);
+
+    Set<String> updated = new HashSet<>();
+    subsMap
+        .entries()
+        .forEach(
+            entry -> {
+              if (!known.contains(entry.getValue().nodeId())) {
+                log.warn(
+                    "Remove lingering subscriptions from unknown node [{}]",
+                    entry.getValue().nodeId());
                 subsMap.remove(entry.getKey(), entry.getValue());
                 updated.add(entry.getKey());
               }
