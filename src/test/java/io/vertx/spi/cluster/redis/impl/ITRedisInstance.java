@@ -231,15 +231,24 @@ class ITRedisInstance {
         .onSuccess(receivedBy::add)
         .compose(v -> topic.publish("World"))
         .onSuccess(receivedBy::add)
-        .compose(v -> topic.unsubscribe(id.get()))
+        .onComplete(v -> completed.set(true));
+
+    await().atMost(2, TimeUnit.SECONDS).until(completed::get);
+    await()
+        .atMost(2, TimeUnit.SECONDS)
+        .until(() -> assertThat(messages).isNotEmpty().containsOnly("Hello", "World"));
+
+    // Unregister and ensure we're not getting the last message.
+    completed.set(false);
+    topic
+        .unsubscribe(id.get())
         .compose(v -> topic.publish("Void"))
         .onSuccess(receivedBy::add)
         .onComplete(v -> completed.set(true));
 
     await().atMost(2, TimeUnit.SECONDS).until(completed::get);
-
-    assertThat(messages).isNotEmpty().containsOnly("Hello", "World");
     assertThat(receivedBy).isEqualTo(asList(1L, 1L, 0L));
+    assertThat(messages).doesNotContain("Void");
   }
 
   @Test
