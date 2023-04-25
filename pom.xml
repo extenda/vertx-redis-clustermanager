@@ -156,7 +156,7 @@
         <!-- Redisson internals -->
         <groupId>org.springframework</groupId>
         <artifactId>spring-core</artifactId>
-        <version>6.0.6</version>
+        <version>6.0.8</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
