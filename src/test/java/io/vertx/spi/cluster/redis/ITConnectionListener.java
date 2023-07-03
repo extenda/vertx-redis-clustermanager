@@ -1,6 +1,8 @@
 package io.vertx.spi.cluster.redis;
 
 import static com.jayway.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
@@ -8,6 +10,7 @@ import io.vertx.spi.cluster.redis.RedisClusterManager.ReconnectListener;
 import io.vertx.spi.cluster.redis.config.RedisConfig;
 import io.vertx.spi.cluster.redis.impl.RedissonContext;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
@@ -22,6 +25,7 @@ class ITConnectionListener {
 
   private RedisClusterManager clusterManager;
   private Vertx vertx;
+  private RedissonContext redissonContext;
 
   private String redisUrl() {
     return "redis://" + REDIS.getHost() + ":" + REDIS.getFirstMappedPort();
@@ -29,8 +33,7 @@ class ITConnectionListener {
 
   @BeforeEach
   void beforeEach() {
-    RedissonContext redissonContext =
-        new RedissonContext(new RedisConfig().addEndpoint(redisUrl()));
+    redissonContext = new RedissonContext(new RedisConfig().addEndpoint(redisUrl()));
     clusterManager = new RedisClusterManager(redissonContext);
 
     VertxOptions options = new VertxOptions().setClusterManager(clusterManager);
@@ -50,10 +53,21 @@ class ITConnectionListener {
 
     await("Disconnected from Redis").atMost(5, TimeUnit.SECONDS).until(listener.disconnected::get);
 
+    Supplier<Boolean> ping =
+        () ->
+            clusterManager
+                .getRedisInstance()
+                .map(RedisInstance::ping)
+                .orElseThrow(IllegalStateException::new);
+
+    assertFalse(ping.get());
+
     REDIS.start();
     await("Reconnected with Redis")
         .atMost(20, TimeUnit.SECONDS)
         .until(() -> !listener.disconnected.get());
+
+    assertTrue(ping.get());
   }
 
   /**
