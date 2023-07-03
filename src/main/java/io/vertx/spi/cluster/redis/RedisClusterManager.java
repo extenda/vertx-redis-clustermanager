@@ -16,6 +16,7 @@ import io.vertx.core.spi.cluster.RegistrationInfo;
 import io.vertx.spi.cluster.redis.config.RedisConfig;
 import io.vertx.spi.cluster.redis.impl.NodeInfoCatalog;
 import io.vertx.spi.cluster.redis.impl.NodeInfoCatalogListener;
+import io.vertx.spi.cluster.redis.impl.RedissonConnectionListener;
 import io.vertx.spi.cluster.redis.impl.RedissonContext;
 import io.vertx.spi.cluster.redis.impl.RedissonRedisInstance;
 import io.vertx.spi.cluster.redis.impl.SubscriptionCatalog;
@@ -24,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 import org.redisson.api.RedissonClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,6 +53,9 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private NodeInfoCatalog nodeInfoCatalog;
   private SubscriptionCatalog subscriptionCatalog;
 
+  /** Visible for test. */
+  ReconnectListener reconnectListener;
+
   /**
    * Create a Redis cluster manager with default configuration from system properties or environment
    * variables.
@@ -76,6 +81,15 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
    */
   public RedisClusterManager(RedisConfig config, ClassLoader dataClassLoader) {
     redissonContext = new RedissonContext(config, dataClassLoader);
+  }
+
+  /**
+   * Create a Redis cluster manager with specified context. Intended for use with tests.
+   *
+   * @param redissonContext the redisson context
+   */
+  RedisClusterManager(RedissonContext redissonContext) {
+    this.redissonContext = redissonContext;
   }
 
   @Override
@@ -162,15 +176,10 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
           if (active.compareAndSet(false, true)) {
             synchronized (this) {
               nodeId = UUID.randomUUID();
-
+              reconnectListener = new ReconnectListener();
+              redissonContext.addConnectionListener(reconnectListener);
               dataGrid = new RedissonRedisInstance(vertx, redissonContext);
-              RedissonClient redisson = redissonContext.client();
-              nodeInfoCatalog =
-                  new NodeInfoCatalog(
-                      vertx, redisson, redissonContext.keyFactory(), nodeId.toString(), this);
-              subscriptionCatalog =
-                  new SubscriptionCatalog(redisson, redissonContext.keyFactory(), nodeSelector);
-              subscriptionCatalog.removeUnknownSubs(nodeId.toString(), nodeInfoCatalog.getNodes());
+              createCatalogs(redissonContext.client());
             }
           } else {
             log.warn("Already activated, nodeId: {}", nodeId);
@@ -178,6 +187,14 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
           prom.complete();
         },
         promise);
+  }
+
+  private void createCatalogs(RedissonClient redisson) {
+    nodeInfoCatalog =
+        new NodeInfoCatalog(vertx, redisson, redissonContext.keyFactory(), nodeId.toString(), this);
+    subscriptionCatalog =
+        new SubscriptionCatalog(redisson, redissonContext.keyFactory(), nodeSelector);
+    subscriptionCatalog.removeUnknownSubs(nodeId.toString(), nodeInfoCatalog.getNodes());
   }
 
   @Override
@@ -200,20 +217,25 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
       log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
 
       // Register self again.
-      nodeInfoCatalog.setNodeInfo(getNodeInfo());
-      nodeSelector.registrationsLost();
-
-      vertx.executeBlocking(
-          prom -> {
-            subscriptionCatalog.republishOwnSubs();
-            prom.complete();
-          },
-          false);
+      registerSelfAgain();
 
       if (nodeListener != null) {
         nodeListener.nodeLeft(nodeId);
       }
     }
+  }
+
+  /** Re-register self in the cluster. */
+  private synchronized void registerSelfAgain() {
+    nodeInfoCatalog.setNodeInfo(getNodeInfo());
+    nodeSelector.registrationsLost();
+
+    vertx.executeBlocking(
+        prom -> {
+          subscriptionCatalog.republishOwnSubs();
+          prom.complete();
+        },
+        false);
   }
 
   @Override
@@ -226,8 +248,11 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
             synchronized (RedisClusterManager.this) {
               try {
                 // Stop catalog services.
-                subscriptionCatalog.close();
-                nodeInfoCatalog.close();
+                closeCatalogs();
+
+                // Detach connection listener
+                redissonContext.removeConnectionListener(reconnectListener);
+                reconnectListener = null;
 
                 // Remove self from cluster.
                 subscriptionCatalog.removeAllForNodes(singleton(nodeId.toString()));
@@ -245,6 +270,11 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
           prom.tryComplete();
         },
         promise);
+  }
+
+  private void closeCatalogs() {
+    subscriptionCatalog.close();
+    nodeInfoCatalog.close();
   }
 
   @Override
@@ -292,5 +322,58 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
       return Optional.empty();
     }
     return Optional.ofNullable(dataGrid);
+  }
+
+  /**
+   * A Redisson connection listener. This listener will re-register Vertx event bus addresses with
+   * the effect of re-joining the cluster again. If we loose the Redis connection, we need to
+   * trigger refresh to ensure our in-memory state is consistent with the Redis data.
+   *
+   * <p>Visible for tests
+   */
+  class ReconnectListener implements RedissonConnectionListener {
+
+    /** Milliseconds to delay the reconnect after a connection is established. */
+    private static final long RECONNECT_DELAY = 5000;
+
+    final AtomicBoolean disconnected = new AtomicBoolean(false);
+    final ReentrantLock reconnectLock = new ReentrantLock();
+
+    /**
+     * Reconnect to the cluster again. A lock is used to ensure we're not doing this multiple times.
+     *
+     * @param promise the promise to complete
+     */
+    private void reconnect(Promise<Void> promise) {
+      reconnectLock.lock();
+      try {
+        if (disconnected.get()) {
+          log.info("Redis connection re-established");
+          closeCatalogs();
+          createCatalogs(redissonContext.client());
+          registerSelfAgain();
+          disconnected.set(false);
+          promise.complete();
+        }
+      } finally {
+        reconnectLock.unlock();
+      }
+    }
+
+    @Override
+    public void onConnect() {
+      if (disconnected.get()) {
+        // Re-establish the cluster connection after a delay.
+        vertx.setTimer(RECONNECT_DELAY, id -> vertx.executeBlocking(this::reconnect));
+      } else {
+        log.info("Redis connection established");
+      }
+    }
+
+    @Override
+    public void onDisconnect() {
+      disconnected.set(true);
+      log.warn("Redis connection lost!");
+    }
   }
 }
