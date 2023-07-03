@@ -334,7 +334,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   class ReconnectListener implements RedissonConnectionListener {
 
     /** Milliseconds to delay the reconnect after a connection is established. */
-    private static final long RECONNECT_DELAY = 5000;
+    private static final long RECONNECT_DELAY = 100;
 
     final AtomicBoolean disconnected = new AtomicBoolean(false);
     final ReentrantLock reconnectLock = new ReentrantLock();
