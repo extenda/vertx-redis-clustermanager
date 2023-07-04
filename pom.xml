@@ -101,7 +101,7 @@
         <!-- Testcontainers internal convergence -->
         <groupId>com.google.http-client</groupId>
         <artifactId>google-http-client</artifactId>
-        <version>1.43.1</version>
+        <version>1.43.3</version>
       </dependency>
       <dependency>
         <groupId>com.jayway.awaitility</groupId>
