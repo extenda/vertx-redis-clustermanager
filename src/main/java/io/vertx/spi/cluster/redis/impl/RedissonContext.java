@@ -4,14 +4,17 @@ import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.spi.cluster.redis.config.ClientType;
 import io.vertx.spi.cluster.redis.config.RedisConfig;
 import io.vertx.spi.cluster.redis.impl.codec.RedisMapCodec;
+import java.net.InetSocketAddress;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
+import org.redisson.connection.ConnectionListener;
 
 /**
  * Redisson context with the active Redisson client.
@@ -25,6 +28,8 @@ public final class RedissonContext {
   private final RedisConfig config;
   private final ConcurrentMap<String, AsyncMap<?, ?>> asyncMapCache = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, SemaphoreWrapper> locksCache = new ConcurrentHashMap<>();
+  private final CopyOnWriteArrayList<RedissonConnectionListener> listeners =
+      new CopyOnWriteArrayList<>();
 
   private RedissonClient client;
   private ExecutorService lockReleaseExec;
@@ -54,6 +59,7 @@ public final class RedissonContext {
       throw new IllegalStateException("RedissonContext only supports STANDALONE client");
     }
 
+    redisConfig.setConnectionListener(new DelegateConnectionListener());
     redisConfig.setCodec(new RedisMapCodec(dataClassLoader));
     if (dataClassLoader != getClass().getClassLoader()) {
       redisConfig.setUseThreadClassLoader(false);
@@ -104,6 +110,26 @@ public final class RedissonContext {
       }
       client = null;
       lockReleaseExec = null;
+    }
+  }
+
+  public void addConnectionListener(RedissonConnectionListener listener) {
+    listeners.addIfAbsent(listener);
+  }
+
+  public void removeConnectionListener(RedissonConnectionListener listener) {
+    listeners.remove(listener);
+  }
+
+  private class DelegateConnectionListener implements ConnectionListener {
+    @Override
+    public void onConnect(InetSocketAddress addr) {
+      listeners.forEach(RedissonConnectionListener::onConnect);
+    }
+
+    @Override
+    public void onDisconnect(InetSocketAddress addr) {
+      listeners.forEach(RedissonConnectionListener::onDisconnect);
     }
   }
 }
