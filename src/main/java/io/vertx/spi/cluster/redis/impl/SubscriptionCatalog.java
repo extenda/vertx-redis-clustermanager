@@ -50,6 +50,16 @@ public class SubscriptionCatalog {
     throttling = new Throttling(this::getAndUpdate);
   }
 
+  public SubscriptionCatalog(
+      SubscriptionCatalog predecessor,
+      RedissonClient redisson,
+      RedisKeyFactory redisKeyFactory,
+      NodeSelector nodeSelector) {
+    this(redisson, redisKeyFactory, nodeSelector);
+    ownSubs.putAll(predecessor.ownSubs);
+    localSubs.putAll(predecessor.localSubs);
+  }
+
   private void onMessage(CharSequence channel, String address) {
     log.trace("Address [{}] updated", address);
     fireRegistrationUpdateEvent(address);
