@@ -192,8 +192,14 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private void createCatalogs(RedissonClient redisson) {
     nodeInfoCatalog =
         new NodeInfoCatalog(vertx, redisson, redissonContext.keyFactory(), nodeId.toString(), this);
-    subscriptionCatalog =
-        new SubscriptionCatalog(redisson, redissonContext.keyFactory(), nodeSelector);
+    if (subscriptionCatalog != null) {
+      subscriptionCatalog =
+          new SubscriptionCatalog(
+              subscriptionCatalog, redisson, redissonContext.keyFactory(), nodeSelector);
+    } else {
+      subscriptionCatalog =
+          new SubscriptionCatalog(redisson, redissonContext.keyFactory(), nodeSelector);
+    }
     subscriptionCatalog.removeUnknownSubs(nodeId.toString(), nodeInfoCatalog.getNodes());
   }
 
