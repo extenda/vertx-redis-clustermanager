@@ -3,15 +3,18 @@ package io.vertx.spi.cluster.redis;
 import static com.jayway.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.after;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
 import io.vertx.spi.cluster.redis.RedisClusterManager.ReconnectListener;
 import io.vertx.spi.cluster.redis.config.RedisConfig;
+import io.vertx.spi.cluster.redis.impl.RedissonConnectionListener;
 import io.vertx.spi.cluster.redis.impl.RedissonContext;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -31,23 +34,30 @@ class ITConnectionListener {
     return "redis://" + REDIS.getHost() + ":" + REDIS.getFirstMappedPort();
   }
 
-  @BeforeEach
-  void beforeEach() {
-    redissonContext = new RedissonContext(new RedisConfig().addEndpoint(redisUrl()));
-    clusterManager = new RedisClusterManager(redissonContext);
+  private RedissonConnectionListener createVertx(
+      boolean useConnectionListener, RedissonConnectionListener listener) {
+    redissonContext =
+        new RedissonContext(
+            new RedisConfig()
+                .addEndpoint(redisUrl())
+                .setUseConnectionListener(useConnectionListener));
+    clusterManager =
+        new RedisClusterManager(redissonContext) {
+          @Override
+          RedissonConnectionListener createConnectionListener() {
+            return listener != null ? listener : super.createConnectionListener();
+          }
+        };
 
     VertxOptions options = new VertxOptions().setClusterManager(clusterManager);
-    Vertx.clusteredVertx(
-        options,
-        ar -> {
-          vertx = ar.result();
-        });
+    Vertx.clusteredVertx(options, ar -> vertx = ar.result());
     await().until(() -> vertx != null);
+    return clusterManager.reconnectListener;
   }
 
   @Test
-  void reconnected() {
-    ReconnectListener listener = clusterManager.reconnectListener;
+  void reconnectedOnEnabled() {
+    ReconnectListener listener = (ReconnectListener) createVertx(true, null);
     REDIS.stop();
     await("Redis stopped").until(() -> !REDIS.isRunning());
 
@@ -68,6 +78,19 @@ class ITConnectionListener {
         .until(() -> !listener.disconnected.get());
 
     assertTrue(ping.get());
+  }
+
+  @Test
+  void reconnectOnDisabled() {
+    RedissonConnectionListener listener = createVertx(false, spy(RedissonConnectionListener.class));
+
+    REDIS.stop();
+    await("Redis stopped").until(() -> !REDIS.isRunning());
+
+    REDIS.start();
+
+    verify(listener, after(500).never()).onConnect();
+    verify(listener, after(500).never()).onDisconnect();
   }
 
   /**
