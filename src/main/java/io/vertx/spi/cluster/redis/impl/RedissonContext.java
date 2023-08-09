@@ -59,7 +59,9 @@ public final class RedissonContext {
       throw new IllegalStateException("RedissonContext only supports STANDALONE client");
     }
 
-    redisConfig.setConnectionListener(new DelegateConnectionListener());
+    if (config.isUseConnectionListener()) {
+      redisConfig.setConnectionListener(new DelegateConnectionListener());
+    }
     redisConfig.setCodec(new RedisMapCodec(dataClassLoader));
     if (dataClassLoader != getClass().getClassLoader()) {
       redisConfig.setUseThreadClassLoader(false);
@@ -114,11 +116,15 @@ public final class RedissonContext {
   }
 
   public void addConnectionListener(RedissonConnectionListener listener) {
-    listeners.addIfAbsent(listener);
+    if (config.isUseConnectionListener()) {
+      listeners.addIfAbsent(listener);
+    }
   }
 
   public void removeConnectionListener(RedissonConnectionListener listener) {
-    listeners.remove(listener);
+    if (config.isUseConnectionListener()) {
+      listeners.remove(listener);
+    }
   }
 
   private class DelegateConnectionListener implements ConnectionListener {

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.vertx.core.json.JsonObject;
 import java.util.regex.Pattern;
@@ -29,15 +30,18 @@ class RedisConfigTest {
       System.setProperty("redis.connection.host", "localhost");
       System.setProperty("redis.connection.port", "8080");
       System.setProperty("redis.key.namespace", "test");
+      System.setProperty("redis.use.connection.listener", "true");
 
       RedisConfig config = new RedisConfig();
       assertEquals("test", config.getKeyNamespace());
       assertEquals(singletonList("rediss://localhost:8080"), config.getEndpoints());
+      assertTrue(config.isUseConnectionListener());
     } finally {
       System.clearProperty("redis.connection.scheme");
       System.clearProperty("redis.connection.host");
       System.clearProperty("redis.connection.port");
       System.clearProperty("redis.key.namespace");
+      System.clearProperty("redis.use.connection.listener");
     }
   }
 
@@ -145,5 +149,13 @@ class RedisConfigTest {
   void lockConfigToString() {
     String toString = assertDoesNotThrow(() -> new LockConfig("test").toString());
     assertThat(toString).contains("leaseTime=-1");
+  }
+
+  @Test
+  void useConnectionListenerEnabled() {
+    RedisConfig expected = complexConfig().setUseConnectionListener(true);
+    assertTrue(expected.isUseConnectionListener());
+    RedisConfig actual = new RedisConfig(expected.toJson());
+    assertEquals(expected, actual);
   }
 }
