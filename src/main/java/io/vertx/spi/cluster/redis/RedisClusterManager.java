@@ -26,7 +26,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantLock;
 import org.redisson.api.RedissonClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -182,7 +181,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
             synchronized (this) {
               nodeId = UUID.randomUUID();
               reconnectListener = createConnectionListener();
-              redissonContext.addConnectionListener(reconnectListener);
+              redissonContext.setConnectionListener(reconnectListener);
               dataGrid = new RedissonRedisInstance(vertx, redissonContext);
               createCatalogs(redissonContext.client());
             }
@@ -262,7 +261,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
                 closeCatalogs();
 
                 // Detach connection listener
-                redissonContext.removeConnectionListener(reconnectListener);
+                redissonContext.setConnectionListener(null);
                 reconnectListener = null;
 
                 // Remove self from cluster.
@@ -347,58 +346,62 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     /** Milliseconds to delay the reconnect after a connection is established. */
     private static final long RECONNECT_DELAY = 100;
 
+    /** Time period during which a disconnect/connect cycle is ignored. */
+    private static final long CONNECTION_GRACE_PERIOD = 100;
+
     private static final long NOT_DISCONNECTED_TIME = -1L;
 
-    final AtomicBoolean disconnected = new AtomicBoolean(false);
-    final ReentrantLock reconnectLock = new ReentrantLock();
     private final AtomicReference<Long> disconnectTime =
         new AtomicReference<>(NOT_DISCONNECTED_TIME);
-    private long timerId = -1;
 
-    private void withLock(Runnable block) {
-      reconnectLock.lock();
-      try {
-        block.run();
-      } finally {
-        reconnectLock.unlock();
-      }
-    }
+    /** Available for tests. */
+    final AtomicReference<String> reconnectStatus = new AtomicReference<>(null);
+
+    final AtomicBoolean disconnected = new AtomicBoolean(false);
+
+    final AtomicBoolean reconnectInProgress = new AtomicBoolean(false);
 
     /**
-     * Reconnect to the cluster again. A lock is used to ensure we're not doing this multiple times.
+     * Reconnect to the cluster again. This runs on the Vertx Blocking Executor Thread.
      *
      * @param promise the promise to complete
      */
-    private void reconnect(Promise<Void> promise) {
-      withLock(
-          () -> {
-            log.info("Redis connection re-established");
-            closeCatalogs();
-            createCatalogs(redissonContext.client());
-            registerSelfAgain();
-            promise.complete();
-            timerId = -1;
-          });
+    void reconnect(Promise<Void> promise) {
+      try {
+        log.info("Reconnecting with Redis...");
+        reconnectStatus.set("reconnecting");
+        closeCatalogs();
+        createCatalogs(redissonContext.client());
+        registerSelfAgain();
+        promise.complete();
+        reconnectStatus.set("success");
+        log.info("Redis connection re-established");
+        reconnectInProgress.set(false);
+      } catch (Exception e) {
+        log.error("Caught exception on reconnect. A retry is scheduled.", e);
+        reconnectStatus.set("failure");
+        reconnectWithDelay();
+        promise.fail(e);
+      }
+    }
+
+    private void reconnectWithDelay() {
+      vertx.setTimer(RECONNECT_DELAY, id -> vertx.executeBlocking(this::reconnect));
     }
 
     @Override
     public void onConnect() {
+      log.debug("Redis connection up");
       if (disconnected.compareAndSet(true, false)) {
-        log.info("Redis connection re-established");
         long disconnectedAt = disconnectTime.getAndSet(NOT_DISCONNECTED_TIME);
         if (disconnectedAt > NOT_DISCONNECTED_TIME
-            && System.currentTimeMillis() - disconnectedAt >= RECONNECT_DELAY) {
-          // Re-establish the cluster connection after a delay.
-          withLock(
-              () -> {
-                if (timerId == -1) {
-                  timerId =
-                      vertx.setTimer(RECONNECT_DELAY, id -> vertx.executeBlocking(this::reconnect));
-                }
-              });
+            && System.currentTimeMillis() - disconnectedAt >= CONNECTION_GRACE_PERIOD
+            && reconnectInProgress.compareAndSet(false, true)) {
+          // Re-establish the cluster connection if we've been disconnected long enough.
+          log.trace("Start new reconnect timer from onConnect");
+          reconnectWithDelay();
         }
       } else {
-        log.debug("Redis connection established");
         disconnectTime.set(NOT_DISCONNECTED_TIME);
       }
     }

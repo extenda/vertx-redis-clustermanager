@@ -2,6 +2,7 @@ package io.vertx.spi.cluster.redis;
 
 import static com.jayway.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.spy;
@@ -15,6 +16,8 @@ import io.vertx.spi.cluster.redis.impl.RedissonConnectionListener;
 import io.vertx.spi.cluster.redis.impl.RedissonContext;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -55,7 +58,13 @@ class ITConnectionListener {
     return clusterManager.reconnectListener;
   }
 
-  @Test
+  @AfterEach
+  void afterEach() {
+    // Close Vertx to not leak instances between tests.
+    vertx.close();
+  }
+
+  @RepeatedTest(3)
   void reconnectedOnEnabled() {
     ReconnectListener listener = (ReconnectListener) createVertx(true, null);
     REDIS.stop();
@@ -73,9 +82,12 @@ class ITConnectionListener {
     assertFalse(ping.get());
 
     REDIS.start();
-    await("Reconnected with Redis")
+    await("Start reconnect with Redis")
         .atMost(20, TimeUnit.SECONDS)
-        .until(() -> !listener.disconnected.get());
+        .until(() -> listener.reconnectStatus.get() != null);
+    await("Completed reconnect with Redis")
+        .atMost(20, TimeUnit.SECONDS)
+        .until(() -> listener.reconnectStatus.get().equals("success"));
 
     assertTrue(ping.get());
   }
@@ -91,6 +103,19 @@ class ITConnectionListener {
 
     verify(listener, after(500).never()).onConnect();
     verify(listener, after(500).never()).onDisconnect();
+  }
+
+  @Test
+  void flakyConnection() {
+    ReconnectListener listener = (ReconnectListener) createVertx(true, null);
+    listener.onConnect();
+    listener.onDisconnect();
+    listener.onDisconnect();
+    listener.onConnect();
+
+    assertNull(listener.reconnectStatus.get());
+    assertFalse(listener.reconnectInProgress.get());
+    assertFalse(listener.disconnected.get());
   }
 
   /**
