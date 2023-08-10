@@ -6,11 +6,12 @@ import io.vertx.spi.cluster.redis.config.RedisConfig;
 import io.vertx.spi.cluster.redis.impl.codec.RedisMapCodec;
 import java.net.InetSocketAddress;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
@@ -28,11 +29,11 @@ public final class RedissonContext {
   private final RedisConfig config;
   private final ConcurrentMap<String, AsyncMap<?, ?>> asyncMapCache = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, SemaphoreWrapper> locksCache = new ConcurrentHashMap<>();
-  private final CopyOnWriteArrayList<RedissonConnectionListener> listeners =
-      new CopyOnWriteArrayList<>();
 
   private RedissonClient client;
   private ExecutorService lockReleaseExec;
+  private AtomicReference<RedissonConnectionListener> connectionListener =
+      new AtomicReference<>(null);
 
   /**
    * Create a new Redisson context with specified configuration.
@@ -115,27 +116,23 @@ public final class RedissonContext {
     }
   }
 
-  public void addConnectionListener(RedissonConnectionListener listener) {
+  public void setConnectionListener(RedissonConnectionListener listener) {
     if (config.isUseConnectionListener()) {
-      listeners.addIfAbsent(listener);
-    }
-  }
-
-  public void removeConnectionListener(RedissonConnectionListener listener) {
-    if (config.isUseConnectionListener()) {
-      listeners.remove(listener);
+      this.connectionListener.set(listener);
     }
   }
 
   private class DelegateConnectionListener implements ConnectionListener {
     @Override
     public void onConnect(InetSocketAddress addr) {
-      listeners.forEach(RedissonConnectionListener::onConnect);
+      Optional.ofNullable(connectionListener.get())
+          .ifPresent(RedissonConnectionListener::onConnect);
     }
 
     @Override
     public void onDisconnect(InetSocketAddress addr) {
-      listeners.forEach(RedissonConnectionListener::onDisconnect);
+      Optional.ofNullable(connectionListener.get())
+          .ifPresent(RedissonConnectionListener::onDisconnect);
     }
   }
 }
