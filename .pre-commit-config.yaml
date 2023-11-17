@@ -13,7 +13,7 @@ repos:
       - id: remove-tabs
         args: [ --whitespaces-count=2 ]
   - repo: https://github.com/extenda/pre-commit-hooks
-    rev: v0.4
+    rev: v0.9.0
     hooks:
       - id: google-java-formatter
       - id: commitlint

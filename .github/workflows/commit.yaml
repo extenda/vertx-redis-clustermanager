@@ -4,14 +4,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-java@v2
+      - uses: actions/setup-java@v3
         with:
           distribution: temurin
-          java-version: 8
+          java-version-file: .java-version
           cache: maven
 
       - name: Run tests
@@ -19,13 +19,6 @@ jobs:
         with:
           service-account-key: ${{ secrets.SECRET_AUTH }}
           args: verify
-
-      - name: Set up Java 11 for Sonar Cloud Analysis
-        uses: actions/setup-java@v2
-        with:
-          distribution: temurin
-          java-version: 11
-          cache: maven
 
       - name: Scan with SonarCloud
         uses: extenda/actions/sonar-scanner@v0
@@ -39,14 +32,14 @@ jobs:
     needs:
       - test
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-java@v2
+      - uses: actions/setup-java@v3
         with:
           distribution: temurin
-          java-version: 8
+          java-version-file: .java-version
           cache: maven
 
       - name: Create release
