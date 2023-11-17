@@ -53,8 +53,8 @@
   </distributionManagement>
 
   <properties>
-    <maven.compiler.source>1.8</maven.compiler.source>
-    <maven.compiler.target>1.8</maven.compiler.target>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
@@ -291,7 +291,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.8.1</version>
+        <version>3.11.0</version>
         <configuration>
           <annotationProcessors>
             <annotationProcessor>io.vertx.codegen.CodeGenProcessor</annotationProcessor>
@@ -316,7 +316,7 @@
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.10</version>
+        <version>0.8.11</version>
         <configuration>
           <propertyName>jacoco.argLine</propertyName>
         </configuration>
@@ -370,7 +370,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.0.0</version>
+        <version>3.2.2</version>
         <configuration>
           <argLine>@{jacoco.argLine} -Dfile.encoding=utf-8</argLine>
           <failIfNoTests>false</failIfNoTests>
@@ -379,7 +379,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-failsafe-plugin</artifactId>
-        <version>3.1.2</version>
+        <version>3.2.2</version>
         <configuration>
           <argLine>@{jacoco.argLine} -Dfile.encoding=utf-8</argLine>
           <!--
@@ -403,7 +403,7 @@
       <plugin>
         <groupId>com.github.ekryd.sortpom</groupId>
         <artifactId>sortpom-maven-plugin</artifactId>
-        <version>3.0.1</version>
+        <version>3.3.0</version>
         <configuration>
           <sortProperties>true</sortProperties>
           <sortDependencies>scope,groupId,artifactId</sortDependencies>
