@@ -42,7 +42,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   private VertxInternal vertx;
   private NodeSelector nodeSelector;
-  private UUID nodeId;
+  private String nodeId;
   private NodeInfo nodeInfo;
   private NodeListener nodeListener;
 
@@ -179,7 +179,8 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
         prom -> {
           if (active.compareAndSet(false, true)) {
             synchronized (this) {
-              nodeId = UUID.randomUUID();
+              nodeId = UUID.randomUUID().toString();
+              log.info("Join cluster as {}", nodeId);
               reconnectListener = createConnectionListener();
               redissonContext.setConnectionListener(reconnectListener);
               dataGrid = new RedissonRedisInstance(vertx, redissonContext);
@@ -195,7 +196,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   private void createCatalogs(RedissonClient redisson) {
     nodeInfoCatalog =
-        new NodeInfoCatalog(vertx, redisson, redissonContext.keyFactory(), nodeId.toString(), this);
+        new NodeInfoCatalog(vertx, redisson, redissonContext.keyFactory(), nodeId, this);
     if (subscriptionCatalog != null) {
       subscriptionCatalog =
           new SubscriptionCatalog(
@@ -204,13 +205,19 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
       subscriptionCatalog =
           new SubscriptionCatalog(redisson, redissonContext.keyFactory(), nodeSelector);
     }
-    subscriptionCatalog.removeUnknownSubs(nodeId.toString(), nodeInfoCatalog.getNodes());
+    subscriptionCatalog.removeUnknownSubs(nodeId, nodeInfoCatalog.getNodes());
+  }
+
+  private synchronized String logId(String nodeId) {
+    return nodeId.equals(this.nodeId) ? "%s (self)".formatted(nodeId) : nodeId;
   }
 
   @Override
   public synchronized void memberAdded(String nodeId) {
     if (isActive()) {
-      log.debug("Add member [{}]", nodeId);
+      if (log.isDebugEnabled()) {
+        log.debug("Add member [{}]", logId(nodeId));
+      }
       if (nodeListener != null) {
         nodeListener.nodeAdded(nodeId);
       }
@@ -221,9 +228,11 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   @Override
   public synchronized void memberRemoved(String nodeId) {
     if (isActive()) {
-      log.debug("Remove member [{}]", nodeId);
+      if (log.isDebugEnabled()) {
+        log.debug("Remove member [{}]", logId(nodeId));
+      }
       subscriptionCatalog.removeAllForNodes(singleton(nodeId));
-      nodeInfoCatalog.remove(nodeId);
+
       log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
 
       // Register self again.
@@ -257,6 +266,8 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
           if (active.compareAndSet(true, false)) {
             synchronized (RedisClusterManager.this) {
               try {
+                log.info("Leave custer as {}", nodeId);
+
                 // Stop catalog services.
                 closeCatalogs();
 
