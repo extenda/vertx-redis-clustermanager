@@ -1,9 +1,11 @@
 package io.vertx.spi.cluster.redis;
 
+import static io.vertx.spi.cluster.redis.impl.CloseableLock.lock;
 import static java.util.Collections.singleton;
 
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
+import io.vertx.core.VertxException;
 import io.vertx.core.impl.VertxInternal;
 import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.core.shareddata.Counter;
@@ -26,6 +28,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import org.redisson.api.RedissonClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +50,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private NodeListener nodeListener;
 
   private final AtomicBoolean active = new AtomicBoolean();
+  private final ReentrantLock lock = new ReentrantLock();
 
   private RedissonRedisInstance dataGrid;
 
@@ -120,7 +124,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public String getNodeId() {
-    return nodeId.toString();
+    return nodeId;
   }
 
   @Override
@@ -135,38 +139,40 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public void setNodeInfo(NodeInfo nodeInfo, Promise<Void> promise) {
-    synchronized (this) {
+    try (var ignored = lock(lock)) {
       this.nodeInfo = nodeInfo;
     }
-    vertx.executeBlocking(
-        prom -> {
-          nodeInfoCatalog.setNodeInfo(nodeInfo);
-          prom.complete();
-        },
-        false,
-        promise);
+    vertx
+        .<Void>executeBlocking(
+            () -> {
+              nodeInfoCatalog.setNodeInfo(nodeInfo);
+              return null;
+            },
+            false)
+        .onComplete(promise);
   }
 
   @Override
   public NodeInfo getNodeInfo() {
-    synchronized (this) {
+    try (var ignored = lock(lock)) {
       return nodeInfo;
     }
   }
 
   @Override
   public void getNodeInfo(String nodeId, Promise<NodeInfo> promise) {
-    vertx.executeBlocking(
-        prom -> {
-          NodeInfo value = nodeInfoCatalog.get(nodeId);
-          if (value != null) {
-            prom.complete(value);
-          } else {
-            prom.fail("Not a member of the cluster");
-          }
-        },
-        false,
-        promise);
+    vertx
+        .executeBlocking(
+            () -> {
+              NodeInfo value = nodeInfoCatalog.get(nodeId);
+              if (value != null) {
+                return value;
+              } else {
+                throw new VertxException("Not a member of the cluster");
+              }
+            },
+            false)
+        .onComplete(promise);
   }
 
   RedissonConnectionListener createConnectionListener() {
@@ -175,23 +181,24 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public void join(Promise<Void> promise) {
-    vertx.executeBlocking(
-        prom -> {
-          if (active.compareAndSet(false, true)) {
-            synchronized (this) {
-              nodeId = UUID.randomUUID().toString();
-              log.info("Join cluster as {}", nodeId);
-              reconnectListener = createConnectionListener();
-              redissonContext.setConnectionListener(reconnectListener);
-              dataGrid = new RedissonRedisInstance(vertx, redissonContext);
-              createCatalogs(redissonContext.client());
-            }
-          } else {
-            log.warn("Already activated, nodeId: {}", nodeId);
-          }
-          prom.complete();
-        },
-        promise);
+    vertx
+        .<Void>executeBlocking(
+            () -> {
+              if (active.compareAndSet(false, true)) {
+                try (var ignored = lock(lock)) {
+                  nodeId = UUID.randomUUID().toString();
+                  log.info("Join cluster as {}", nodeId);
+                  reconnectListener = createConnectionListener();
+                  redissonContext.setConnectionListener(reconnectListener);
+                  dataGrid = new RedissonRedisInstance(vertx, redissonContext);
+                  createCatalogs(redissonContext.client());
+                }
+              } else {
+                log.warn("Already activated, nodeId: {}", nodeId);
+              }
+              return null;
+            })
+        .onComplete(promise);
   }
 
   private void createCatalogs(RedissonClient redisson) {
@@ -208,89 +215,94 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     subscriptionCatalog.removeUnknownSubs(nodeId, nodeInfoCatalog.getNodes());
   }
 
-  private synchronized String logId(String nodeId) {
-    return nodeId.equals(this.nodeId) ? "%s (self)".formatted(nodeId) : nodeId;
-  }
-
-  @Override
-  public synchronized void memberAdded(String nodeId) {
-    if (isActive()) {
-      if (log.isDebugEnabled()) {
-        log.debug("Add member [{}]", logId(nodeId));
-      }
-      if (nodeListener != null) {
-        nodeListener.nodeAdded(nodeId);
-      }
-      log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
+  private String logId(String nodeId) {
+    try (var ignored = lock(lock)) {
+      return nodeId.equals(this.nodeId) ? "%s (self)".formatted(nodeId) : nodeId;
     }
   }
 
   @Override
-  public synchronized void memberRemoved(String nodeId) {
-    if (isActive()) {
-      if (log.isDebugEnabled()) {
-        log.debug("Remove member [{}]", logId(nodeId));
+  public void memberAdded(String nodeId) {
+    try (var ignored = lock(lock)) {
+      if (isActive()) {
+        if (log.isDebugEnabled()) {
+          log.debug("Add member [{}]", logId(nodeId));
+        }
+        if (nodeListener != null) {
+          nodeListener.nodeAdded(nodeId);
+        }
+        log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
       }
-      subscriptionCatalog.removeAllForNodes(singleton(nodeId));
+    }
+  }
 
-      log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
+  @Override
+  public void memberRemoved(String nodeId) {
+    try (var ignored = lock(lock)) {
+      if (isActive()) {
+        if (log.isDebugEnabled()) {
+          log.debug("Remove member [{}]", logId(nodeId));
+        }
+        subscriptionCatalog.removeAllForNodes(singleton(nodeId));
 
-      // Register self again.
-      registerSelfAgain();
+        log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
 
-      if (nodeListener != null) {
-        nodeListener.nodeLeft(nodeId);
+        // Register self again.
+        registerSelfAgain();
+
+        if (nodeListener != null) {
+          nodeListener.nodeLeft(nodeId);
+        }
       }
     }
   }
 
   /** Re-register self in the cluster. */
-  private synchronized void registerSelfAgain() {
-    nodeInfoCatalog.setNodeInfo(getNodeInfo());
-    nodeSelector.registrationsLost();
+  private void registerSelfAgain() {
+    try (var ignored = lock(lock)) {
+      nodeInfoCatalog.setNodeInfo(getNodeInfo());
+      nodeSelector.registrationsLost();
 
-    vertx.executeBlocking(
-        prom -> {
-          subscriptionCatalog.republishOwnSubs();
-          prom.complete();
-        },
-        false);
+      vertx.executeBlocking(
+          () -> {
+            subscriptionCatalog.republishOwnSubs();
+            return null;
+          },
+          false);
+    }
   }
 
   @Override
   public void leave(Promise<Void> promise) {
-    vertx.executeBlocking(
-        prom -> {
-          // We need this to be synchronized to prevent other calls from happening while leaving the
-          // cluster, typically memberAdded and memberRemoved.
-          if (active.compareAndSet(true, false)) {
-            synchronized (RedisClusterManager.this) {
-              try {
-                log.info("Leave custer as {}", nodeId);
+    vertx
+        .<Void>executeBlocking(
+            () -> {
+              // We need this to be synchronized to prevent other calls from happening while leaving
+              // the cluster, typically memberAdded and memberRemoved.
+              if (active.compareAndSet(true, false)) {
+                try (var ignored = lock(lock)) {
+                  log.info("Leave custer as {}", nodeId);
 
-                // Stop catalog services.
-                closeCatalogs();
+                  // Stop catalog services.
+                  closeCatalogs();
 
-                // Detach connection listener
-                redissonContext.setConnectionListener(null);
-                reconnectListener = null;
+                  // Detach connection listener
+                  redissonContext.setConnectionListener(null);
+                  reconnectListener = null;
 
-                // Remove self from cluster.
-                subscriptionCatalog.removeAllForNodes(singleton(nodeId.toString()));
-                nodeInfoCatalog.remove(nodeId.toString());
+                  // Remove self from cluster.
+                  subscriptionCatalog.removeAllForNodes(singleton(nodeId));
+                  nodeInfoCatalog.remove(nodeId);
 
-                // Disconnect from Redis
-                redissonContext.shutdown();
-              } catch (Exception e) {
-                prom.fail(e);
+                  // Disconnect from Redis
+                  redissonContext.shutdown();
+                }
+              } else {
+                log.warn("Already deactivated, nodeId: {}", nodeId);
               }
-            }
-          } else {
-            log.warn("Already deactivated, nodeId: {}", nodeId);
-          }
-          prom.tryComplete();
-        },
-        promise);
+              return null;
+            })
+        .onComplete(promise);
   }
 
   private void closeCatalogs() {
@@ -306,30 +318,32 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   @Override
   public void addRegistration(
       String address, RegistrationInfo registrationInfo, Promise<Void> promise) {
-    vertx.executeBlocking(
-        prom -> {
-          subscriptionCatalog.put(address, registrationInfo);
-          prom.complete();
-        },
-        false,
-        promise);
+    vertx
+        .<Void>executeBlocking(
+            () -> {
+              subscriptionCatalog.put(address, registrationInfo);
+              return null;
+            },
+            false)
+        .onComplete(promise);
   }
 
   @Override
   public void removeRegistration(
       String address, RegistrationInfo registrationInfo, Promise<Void> promise) {
-    vertx.executeBlocking(
-        prom -> {
-          subscriptionCatalog.remove(address, registrationInfo);
-          prom.complete();
-        },
-        false,
-        promise);
+    vertx
+        .<Void>executeBlocking(
+            () -> {
+              subscriptionCatalog.remove(address, registrationInfo);
+              return null;
+            },
+            false)
+        .onComplete(promise);
   }
 
   @Override
   public void getRegistrations(String address, Promise<List<RegistrationInfo>> promise) {
-    vertx.executeBlocking(prom -> prom.complete(subscriptionCatalog.get(address)), false, promise);
+    vertx.executeBlocking(() -> subscriptionCatalog.get(address), false).onComplete(promise);
   }
 
   /**
@@ -372,19 +386,14 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
     final AtomicBoolean reconnectInProgress = new AtomicBoolean(false);
 
-    /**
-     * Reconnect to the cluster again. This runs on the Vertx Blocking Executor Thread.
-     *
-     * @param promise the promise to complete
-     */
-    void reconnect(Promise<Void> promise) {
+    /** Reconnect to the cluster again. This runs on the Vertx Blocking Executor Thread. */
+    void reconnect() {
       try {
         log.info("Reconnecting with Redis...");
         reconnectStatus.set("reconnecting");
         closeCatalogs();
         createCatalogs(redissonContext.client());
         registerSelfAgain();
-        promise.complete();
         reconnectStatus.set("success");
         log.info("Redis connection re-established");
         reconnectInProgress.set(false);
@@ -392,12 +401,18 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
         log.error("Caught exception on reconnect. A retry is scheduled.", e);
         reconnectStatus.set("failure");
         reconnectWithDelay();
-        promise.fail(e);
       }
     }
 
     private void reconnectWithDelay() {
-      vertx.setTimer(RECONNECT_DELAY, id -> vertx.executeBlocking(this::reconnect));
+      vertx.setTimer(
+          RECONNECT_DELAY,
+          id ->
+              vertx.<Void>executeBlocking(
+                  () -> {
+                    reconnect();
+                    return null;
+                  }));
     }
 
     @Override

@@ -32,7 +32,7 @@ public final class RedissonContext {
 
   private RedissonClient client;
   private ExecutorService lockReleaseExec;
-  private AtomicReference<RedissonConnectionListener> connectionListener =
+  private final AtomicReference<RedissonConnectionListener> connectionListener =
       new AtomicReference<>(null);
 
   /**

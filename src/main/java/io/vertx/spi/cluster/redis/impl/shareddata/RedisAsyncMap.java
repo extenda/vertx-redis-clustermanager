@@ -5,6 +5,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.shareddata.AsyncMap;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -75,7 +76,7 @@ public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
   }
 
   private CompletionStage<Boolean> updateTimeToLive(K k, long ttl) {
-    return map.updateEntryExpirationAsync(k, ttl, MILLISECONDS, 0, MILLISECONDS);
+    return map.expireEntryAsync(k, Duration.ofMillis(ttl), Duration.ofMillis(0));
   }
 
   private <R> CompletionStage<R> succeededWith(R value) {

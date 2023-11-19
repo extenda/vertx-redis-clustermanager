@@ -111,7 +111,7 @@ public final class RedissonRedisInstance implements RedisInstance {
   @Override
   public Future<Lock> getLockWithTimeout(String name, long timeout) {
     return vertx.executeBlocking(
-        prom -> {
+        () -> {
           SemaphoreWrapper semaphore =
               redissonContext.locksCache().computeIfAbsent(name, this::createSemaphore);
           RedisLock lock;
@@ -127,7 +127,7 @@ public final class RedissonRedisInstance implements RedisInstance {
             remaining = remaining - MILLISECONDS.convert(System.nanoTime() - start, NANOSECONDS);
           } while (lock == null && remaining > 0);
           if (lock != null) {
-            prom.complete(lock);
+            return lock;
           } else {
             throw new VertxException("Timed out waiting to get lock " + name);
           }
