@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
 import org.redisson.api.map.event.EntryCreatedListener;
@@ -21,6 +23,7 @@ public class NodeInfoCatalog {
   /** Node time-to-live in Redis cache. */
   private static final int TTL_SECONDS = 30;
 
+  private final Lock lock = new ReentrantLock();
   private final RMapCache<String, NodeInfo> nodeInfoMap;
   private final Vertx vertx;
   private final String nodeId;
@@ -28,6 +31,7 @@ public class NodeInfoCatalog {
   private final long timerId;
   private final ExecutorService executor =
       Executors.newSingleThreadExecutor(r -> new Thread(r, "vertx-redis-nodeInfo-thread"));
+  private NodeInfo nodeInfo;
 
   public NodeInfoCatalog(
       Vertx vertx,
@@ -52,12 +56,16 @@ public class NodeInfoCatalog {
     listenerIds.add(nodeInfoMap.addListener(entryExpired));
 
     // This periodic timer will keep the node from expiring as long as the process is running.
-    timerId = vertx.setPeriodic(TimeUnit.SECONDS.toMillis(TTL_SECONDS / 2), this::keepNodeAlive);
+    timerId = vertx.setPeriodic(TimeUnit.SECONDS.toMillis(TTL_SECONDS / 2), id -> registerNode());
   }
 
-  private void keepNodeAlive(Long timerId) {
-    nodeInfoMap.updateEntryExpirationAsync(
-        nodeId, TTL_SECONDS, TimeUnit.SECONDS, 0, TimeUnit.MILLISECONDS);
+  /** Register the node in the catalog. This will keep the node alive for TTL_SECONDS. */
+  private void registerNode() {
+    try (var ignored = CloseableLock.lock(lock)) {
+      if (nodeInfo != null) {
+        nodeInfoMap.fastPut(nodeId, nodeInfo, TTL_SECONDS, TimeUnit.SECONDS);
+      }
+    }
   }
 
   /**
@@ -76,7 +84,10 @@ public class NodeInfoCatalog {
    * @param nodeInfo the node information
    */
   public void setNodeInfo(NodeInfo nodeInfo) {
-    nodeInfoMap.fastPut(nodeId, nodeInfo, TTL_SECONDS, TimeUnit.SECONDS);
+    try (var ignored = CloseableLock.lock(lock)) {
+      this.nodeInfo = nodeInfo;
+      registerNode();
+    }
   }
 
   public void remove(String nodeId) {
@@ -93,12 +104,28 @@ public class NodeInfoCatalog {
   }
 
   public void close() {
-    listenerIds.forEach(nodeInfoMap::removeListener);
-    vertx.cancelTimer(timerId);
+    try (var ignored = CloseableLock.lock(lock)) {
+      listenerIds.forEach(nodeInfoMap::removeListener);
+      setNodeInfo(null);
+      vertx.cancelTimer(timerId);
+    }
   }
 
   @Override
   public String toString() {
-    return nodeInfoMap.values().stream().map(NodeInfo::toString).collect(joining("\n"));
+    return nodeInfoMap.entrySet().stream()
+        .map(
+            entry -> {
+              StringBuilder sb =
+                  new StringBuilder("  - [")
+                      .append(entry.getKey())
+                      .append("]: ")
+                      .append(entry.getValue());
+              if (entry.getKey().equals(nodeId)) {
+                sb.append(" (self)");
+              }
+              return sb.toString();
+            })
+        .collect(joining("\n"));
   }
 }

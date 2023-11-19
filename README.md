@@ -35,7 +35,7 @@ environment variables.
 
 ## Development
 
-The project is built with OpenJDK 8 and Maven.
+The project is built with OpenJDK 21 and Maven.
 
 To build the project with all tests, run
 ```bash
@@ -46,4 +46,9 @@ Ensure you install and enable [pre-commit](https://pre-commit.com) before commit
 
 ```bash
 pre-commit install -t pre-commit -t commit-msg
+```
+
+When developing your applications, it can be handy to spin up a Redis with Docker.
+```bash
+docker run --rm -it -p 6379:6379 redis:6-alpine redis-server --save ''
 ```
