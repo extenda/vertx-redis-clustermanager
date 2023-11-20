@@ -21,10 +21,10 @@ public interface RedisInstance extends RedisDataGrid {
    * @return an optional with the Redis instance.
    */
   static Optional<RedisInstance> create(Vertx vertx) {
-    if (vertx instanceof VertxInternal) {
-      ClusterManager clusterManager = ((VertxInternal) vertx).getClusterManager();
-      if (clusterManager instanceof RedisClusterManager) {
-        return ((RedisClusterManager) clusterManager).getRedisInstance();
+    if (vertx instanceof VertxInternal vertxInternal) {
+      ClusterManager clusterManager = vertxInternal.getClusterManager();
+      if (clusterManager instanceof RedisClusterManager rcm) {
+        return rcm.getRedisInstance();
       }
     }
     return Optional.empty();

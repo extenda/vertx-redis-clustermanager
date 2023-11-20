@@ -1,11 +1,16 @@
 package io.vertx.spi.cluster.redis.impl;
 
+import static io.vertx.spi.cluster.redis.impl.CloseableLock.lock;
+
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 /**
@@ -122,7 +127,8 @@ class Throttling {
    */
   private final AtomicInteger counter;
 
-  private final Object condition;
+  private final Lock lock;
+  private final Condition condition;
 
   Throttling(Consumer<String> action) {
     this.action = action;
@@ -135,7 +141,8 @@ class Throttling {
             });
     map = new ConcurrentHashMap<>();
     counter = new AtomicInteger();
-    condition = new Object();
+    lock = new ReentrantLock();
+    condition = lock.newCondition();
   }
 
   public void onEvent(String address) {
@@ -182,14 +189,14 @@ class Throttling {
 
   private void decrementCounter() {
     if (counter.decrementAndGet() < 0) {
-      synchronized (condition) {
-        condition.notifyAll();
+      try (var ignored = lock(lock)) {
+        condition.signalAll();
       }
     }
   }
 
   public void close() {
-    synchronized (condition) {
+    try (var ignored = lock(lock)) {
       int i = counter.getAndSet(-1);
       if (i == 0) {
         return;
@@ -197,7 +204,7 @@ class Throttling {
       boolean interrupted = false;
       do {
         try {
-          condition.wait();
+          condition.await();
         } catch (InterruptedException e) { // NOSONAR
           interrupted = true;
         }

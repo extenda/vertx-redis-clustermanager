@@ -23,16 +23,18 @@ public interface ClusterHealthCheck {
   static Handler<Promise<Status>> createProcedure(Vertx vertx) {
     Objects.requireNonNull(vertx);
     return healthCheckPromise ->
-        vertx.executeBlocking(
-            promise -> {
-              VertxInternal vertxInternal = (VertxInternal) Vertx.currentContext().owner();
-              RedisClusterManager clusterManager =
-                  (RedisClusterManager) vertxInternal.getClusterManager();
-              boolean connected =
-                  clusterManager.getRedisInstance().map(RedisInstance::ping).orElse(false);
-              promise.complete(new Status().setOk(connected));
-            },
-            false,
-            healthCheckPromise);
+        vertx.executeBlocking(ClusterHealthCheck::getStatus, false).onComplete(healthCheckPromise);
+  }
+
+  /**
+   * Get the cluster manager status.
+   *
+   * @return the health status.
+   */
+  private static Status getStatus() {
+    VertxInternal vertxInternal = (VertxInternal) Vertx.currentContext().owner();
+    RedisClusterManager clusterManager = (RedisClusterManager) vertxInternal.getClusterManager();
+    boolean connected = clusterManager.getRedisInstance().map(RedisInstance::ping).orElse(false);
+    return new Status().setOk(connected);
   }
 }

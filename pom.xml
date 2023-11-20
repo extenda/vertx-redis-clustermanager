@@ -389,6 +389,8 @@
           <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
           <summaryFile>${project.build.directory}/surefire-reports/failsafe-summary.xml</summaryFile>
           <runOrder>alphabetical</runOrder>
+          <!-- New fork for every integration test as Redisson leaks eviction tasks. -->
+          <reuseForks>false</reuseForks>
           <rerunFailingTestsCount>2</rerunFailingTestsCount>
         </configuration>
         <executions>
