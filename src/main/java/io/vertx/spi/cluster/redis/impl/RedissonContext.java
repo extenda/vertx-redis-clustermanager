@@ -1,5 +1,7 @@
 package io.vertx.spi.cluster.redis.impl;
 
+import static io.vertx.spi.cluster.redis.impl.CloseableLock.lock;
+
 import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.spi.cluster.redis.config.ClientType;
 import io.vertx.spi.cluster.redis.config.RedisConfig;
@@ -12,6 +14,8 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
@@ -34,6 +38,7 @@ public final class RedissonContext {
   private ExecutorService lockReleaseExec;
   private final AtomicReference<RedissonConnectionListener> connectionListener =
       new AtomicReference<>(null);
+  private final Lock lock = new ReentrantLock();
 
   /**
    * Create a new Redisson context with specified configuration.
@@ -80,12 +85,12 @@ public final class RedissonContext {
   }
 
   public RedissonClient client() {
-    synchronized (this) {
+    try (var ignored = lock(lock)) {
       if (client == null) {
         client = Redisson.create(redisConfig);
         lockReleaseExec =
             Executors.newCachedThreadPool(
-                r -> new Thread(r, "vertx-redis-service-release-lock-thread"));
+                Thread.ofPlatform().name("vertx-redis-service-release-lock-thread", 1).factory());
       }
       return client;
     }
@@ -104,7 +109,7 @@ public final class RedissonContext {
   }
 
   public void shutdown() {
-    synchronized (this) {
+    try (var ignored = lock(lock)) {
       if (client != null) {
         client.shutdown();
         lockReleaseExec.shutdown();
