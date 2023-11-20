@@ -9,7 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.vertx.core.buffer.Buffer;
+import io.vertx.core.buffer.impl.BufferImpl;
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.shareddata.AsyncMapTest;
 import io.vertx.core.spi.cluster.NodeInfo;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -41,15 +43,34 @@ class ClusterSerializableCodecTest extends CodecTestBase {
 
   @Test
   void decodeFailsIfMissingClassName() {
-    Buffer buffer = Buffer.buffer(ByteBufAllocator.DEFAULT.buffer());
+    ByteBuf byteBuf = ByteBufAllocator.DEFAULT.buffer();
+    Buffer buffer = BufferImpl.buffer(byteBuf);
     info.writeToBuffer(buffer);
-    assertThrows(
-        IOException.class, () -> codec.getValueDecoder().decode(buffer.getByteBuf(), new State()));
+    assertThrows(IOException.class, () -> codec.getValueDecoder().decode(byteBuf, new State()));
   }
 
   @Test
   void encodeFailsIfNotClusterSerializable() {
     assertThrows(IOException.class, () -> codec.getValueEncoder().encode("Test"));
+  }
+
+  @Test
+  void encodeDecodeSomeSerializableClusterObject() {
+    var original = new AsyncMapTest.SomeClusterSerializableObject("Test");
+    ByteBuf buf = assertDoesNotThrow(() -> codec.getValueEncoder().encode(original));
+    Object decoded = assertDoesNotThrow(() -> codec.getValueDecoder().decode(buf, new State()));
+    assertInstanceOf(AsyncMapTest.SomeClusterSerializableObject.class, decoded);
+    assertEquals(original, decoded);
+  }
+
+  @SuppressWarnings("deprecation")
+  @Test
+  void encodeDecodeSomeClusterSerializableImplObject() {
+    var original = new AsyncMapTest.SomeClusterSerializableImplObject("Test");
+    ByteBuf buf = assertDoesNotThrow(() -> codec.getValueEncoder().encode(original));
+    Object decoded = assertDoesNotThrow(() -> codec.getValueDecoder().decode(buf, new State()));
+    assertInstanceOf(AsyncMapTest.SomeClusterSerializableImplObject.class, decoded);
+    assertEquals(original, decoded);
   }
 
   @Test

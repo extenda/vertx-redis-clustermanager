@@ -9,8 +9,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.atomic.AtomicReference;
 import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
 import org.redisson.api.map.event.EntryCreatedListener;
@@ -23,7 +22,6 @@ public class NodeInfoCatalog {
   /** Node time-to-live in Redis cache. */
   private static final int TTL_SECONDS = 30;
 
-  private final Lock lock = new ReentrantLock();
   private final RMapCache<String, NodeInfo> nodeInfoMap;
   private final Vertx vertx;
   private final String nodeId;
@@ -31,7 +29,7 @@ public class NodeInfoCatalog {
   private final long timerId;
   private final ExecutorService executor =
       Executors.newSingleThreadExecutor(r -> new Thread(r, "vertx-redis-nodeInfo-thread"));
-  private NodeInfo nodeInfo;
+  private final AtomicReference<NodeInfo> nodeInfo = new AtomicReference<>();
 
   public NodeInfoCatalog(
       Vertx vertx,
@@ -61,11 +59,13 @@ public class NodeInfoCatalog {
 
   /** Register the node in the catalog. This will keep the node alive for TTL_SECONDS. */
   private void registerNode() {
-    try (var ignored = CloseableLock.lock(lock)) {
-      if (nodeInfo != null) {
-        nodeInfoMap.fastPut(nodeId, nodeInfo, TTL_SECONDS, TimeUnit.SECONDS);
-      }
-    }
+    executor.submit(
+        () -> {
+          NodeInfo info = nodeInfo.get();
+          if (info != null) {
+            nodeInfoMap.fastPut(nodeId, info, TTL_SECONDS, TimeUnit.SECONDS);
+          }
+        });
   }
 
   /**
@@ -84,10 +84,8 @@ public class NodeInfoCatalog {
    * @param nodeInfo the node information
    */
   public void setNodeInfo(NodeInfo nodeInfo) {
-    try (var ignored = CloseableLock.lock(lock)) {
-      this.nodeInfo = nodeInfo;
-      registerNode();
-    }
+    this.nodeInfo.set(nodeInfo);
+    registerNode();
   }
 
   public void remove(String nodeId) {
@@ -104,11 +102,9 @@ public class NodeInfoCatalog {
   }
 
   public void close() {
-    try (var ignored = CloseableLock.lock(lock)) {
-      listenerIds.forEach(nodeInfoMap::removeListener);
-      setNodeInfo(null);
-      vertx.cancelTimer(timerId);
-    }
+    listenerIds.forEach(nodeInfoMap::removeListener);
+    setNodeInfo(null);
+    vertx.cancelTimer(timerId);
   }
 
   @Override
