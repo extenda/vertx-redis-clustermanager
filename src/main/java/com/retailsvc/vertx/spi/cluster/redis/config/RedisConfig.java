@@ -6,6 +6,7 @@ import static java.util.Collections.unmodifiableList;
 import io.vertx.codegen.annotations.DataObject;
 import io.vertx.codegen.annotations.GenIgnore;
 import io.vertx.codegen.json.annotations.JsonGen;
+import io.vertx.codegen.annotations.Nullable;
 import io.vertx.core.json.JsonObject;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -41,6 +42,13 @@ public class RedisConfig {
   /** Lock configuration. */
   private final List<LockConfig> locks = new ArrayList<>();
 
+  /** Use connection listener. */
+  private boolean useConnectionListener;
+
+  @Nullable private String password = null;
+  @Nullable private String username = null;
+
+
   /** Create the default configuration from existing environment variables. */
   public RedisConfig() {
     defaultEndpoint = RedisConfigProps.getDefaultEndpoint().toASCIIString();
@@ -56,6 +64,8 @@ public class RedisConfig {
     defaultEndpoint = other.defaultEndpoint;
     type = other.type;
     keyNamespace = other.keyNamespace;
+    password = other.password;
+    username = other.username;
     endpoints = new ArrayList<>(other.endpoints);
     other.maps.stream().map(MapConfig::new).forEach(maps::add);
     other.locks.stream().map(LockConfig::new).forEach(locks::add);
@@ -89,6 +99,42 @@ public class RedisConfig {
    */
   public String getKeyNamespace() {
     return keyNamespace == null ? "" : keyNamespace;
+  }
+
+  /**
+   * Set the password
+   *
+   * @param password the password
+   * @return fluent self
+   */
+  public RedisConfig setPassword(String password) {
+    this.password = password;
+    return this;
+  }
+
+  /**
+   * @return the password
+   */
+  public String getPassword() {
+    return password == null ? "" : password;
+  }
+
+  /**
+   * Set the username
+   *
+   * @param username the username
+   * @return fluent self
+   */
+  public RedisConfig setUsername(String username) {
+    this.username = username;
+    return this;
+  }
+
+  /**
+   * @return the password
+   */
+  public String getUsername() {
+    return username == null ? "" : username;
   }
 
   /**
@@ -231,6 +277,8 @@ public class RedisConfig {
     RedisConfig that = (RedisConfig) o;
     return type == that.type
         && Objects.equals(keyNamespace, that.keyNamespace)
+        && Objects.equals(password, that.password)
+        && Objects.equals(username, that.username)
         && defaultEndpoint.equals(that.defaultEndpoint)
         && endpoints.equals(that.endpoints)
         && maps.equals(that.maps)
@@ -239,7 +287,8 @@ public class RedisConfig {
 
   @Override
   public int hashCode() {
-    return Objects.hash(type, keyNamespace, defaultEndpoint, endpoints, maps, locks);
+    return Objects.hash(
+        type, keyNamespace, username, password, defaultEndpoint, endpoints, useConnectionListener, maps, locks);
   }
 
   @Override
