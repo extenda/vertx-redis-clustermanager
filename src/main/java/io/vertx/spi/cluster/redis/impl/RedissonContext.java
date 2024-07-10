@@ -16,9 +16,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
+import jodd.util.StringUtil;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
+import org.redisson.config.ClusterServersConfig;
 import org.redisson.config.Config;
+import org.redisson.config.ReplicatedServersConfig;
+import org.redisson.config.SingleServerConfig;
 import org.redisson.connection.ConnectionListener;
 
 /**
@@ -60,9 +65,45 @@ public final class RedissonContext {
     redisConfig = new Config();
 
     if (config.getClientType() == ClientType.STANDALONE) {
-      redisConfig.useSingleServer().setAddress(config.getEndpoints().get(0));
+      SingleServerConfig singleServerConfig = redisConfig.useSingleServer();
+      singleServerConfig.setAddress(config.getEndpoints().get(0));
+      singleServerConfig.setTimeout(10_000);
+      singleServerConfig.setRetryAttempts(5);
+      singleServerConfig.setRetryInterval(1_000);
+      if (StringUtil.isNotEmpty(config.getUsername())) {
+        singleServerConfig.setUsername(config.getUsername());
+      }
+      if (StringUtil.isNotEmpty(config.getPassword())) {
+        singleServerConfig.setPassword(config.getPassword());
+      }
+    } else if (config.getClientType() == ClientType.CLUSTER) {
+      ClusterServersConfig clusterServersConfig = redisConfig.useClusterServers();
+      clusterServersConfig.setNodeAddresses(config.getEndpoints());
+      clusterServersConfig.setTimeout(10_000);
+      clusterServersConfig.setRetryAttempts(5);
+      clusterServersConfig.setRetryInterval(1_000);
+
+      if (StringUtil.isNotEmpty(config.getUsername())) {
+        clusterServersConfig.setUsername(config.getUsername());
+      }
+      if (StringUtil.isNotEmpty(config.getPassword())) {
+        clusterServersConfig.setPassword(config.getPassword());
+      }
+    } else if (config.getClientType() == ClientType.REPLICATED) {
+      ReplicatedServersConfig replicatedServersConfig = redisConfig.useReplicatedServers();
+      replicatedServersConfig.setNodeAddresses(config.getEndpoints());
+      replicatedServersConfig.setTimeout(10_000);
+      replicatedServersConfig.setRetryAttempts(5);
+      replicatedServersConfig.setRetryInterval(1_000);
+
+      if (StringUtil.isNotEmpty(config.getUsername())) {
+        replicatedServersConfig.setUsername(config.getUsername());
+      }
+      if (StringUtil.isNotEmpty(config.getPassword())) {
+        replicatedServersConfig.setPassword(config.getPassword());
+      }
     } else {
-      throw new IllegalStateException("RedissonContext only supports STANDALONE client");
+     throw new IllegalStateException("ClientType not support: " + config.getClientType());
     }
 
     if (config.isUseConnectionListener()) {
