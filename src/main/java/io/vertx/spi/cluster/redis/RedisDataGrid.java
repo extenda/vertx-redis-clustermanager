@@ -8,6 +8,7 @@ import io.vertx.core.shareddata.Lock;
 import io.vertx.spi.cluster.redis.config.RedisConfig;
 import io.vertx.spi.cluster.redis.impl.RedissonContext;
 import io.vertx.spi.cluster.redis.impl.RedissonRedisInstance;
+import java.io.Serializable;
 import java.util.Map;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.BlockingQueue;
@@ -112,6 +113,15 @@ public interface RedisDataGrid {
    * @return a blocking deque instance.
    */
   <V> BlockingDeque<V> getBlockingDeque(String name);
+
+  /**
+   * Returns a container backed by Redis.
+   *
+   * @param <V> type of value
+   * @param name name of the container
+   * @return a container instance.
+   */
+  <V extends Serializable> Container<V> getContainer(String name);
 
   /**
    * Returns a topic backed by Redis.

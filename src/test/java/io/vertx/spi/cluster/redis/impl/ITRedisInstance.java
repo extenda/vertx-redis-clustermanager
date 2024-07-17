@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.jayway.awaitility.Duration;
+import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
 import io.vertx.core.shareddata.AsyncMap;
@@ -24,13 +25,16 @@ import io.vertx.spi.cluster.redis.TopicSubscriber;
 import io.vertx.spi.cluster.redis.config.LockConfig;
 import io.vertx.spi.cluster.redis.config.MapConfig;
 import io.vertx.spi.cluster.redis.config.RedisConfig;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
@@ -266,5 +270,49 @@ class ITRedisInstance {
             ExecutionException.class,
             () -> c.get().toCompletionStage().toCompletableFuture().get());
     assertThat(ex).hasMessageContaining("Redisson is shutdown");
+  }
+
+  @Test
+  void containerReadWrite() {
+    io.vertx.spi.cluster.redis.Container<Instant> container =
+        redisInstance().getContainer("testContainer1");
+    assertTrue(container.get().isEmpty());
+    Instant now = Instant.now();
+    container.set(now);
+    assertEquals(now, container.get().get());
+  }
+
+  @Test
+  void containerDelete() {
+    io.vertx.spi.cluster.redis.Container<Instant> container =
+        redisInstance().getContainer("testContainer2");
+    assertTrue(container.get().isEmpty());
+    Instant now = Instant.now();
+    container.set(now);
+    container.set(null);
+    assertTrue(container.get().isEmpty());
+  }
+
+  @Test
+  void containerDeleteAsync() throws ExecutionException, InterruptedException, TimeoutException {
+    io.vertx.spi.cluster.redis.Container<Instant> container =
+        redisInstance().getContainer("testContainer2");
+    assertTrue(container.get().isEmpty());
+    Instant now = Instant.now();
+    container.setAsync(now).toCompletionStage().toCompletableFuture().get(2, TimeUnit.SECONDS);
+    container.setAsync(null).toCompletionStage().toCompletableFuture().get(2, TimeUnit.SECONDS);
+    assertTrue(container.get().isEmpty());
+  }
+
+  @Test
+  void containerReadWriteAsync() throws ExecutionException, InterruptedException, TimeoutException {
+    io.vertx.spi.cluster.redis.Container<Instant> test =
+        redisInstance().getContainer("testContainer3");
+    Instant expected = Instant.now();
+    Future<Void> result = test.setAsync(expected);
+    result.toCompletionStage().toCompletableFuture().get(2, TimeUnit.SECONDS);
+    Optional<Instant> actual =
+        test.getAsync().toCompletionStage().toCompletableFuture().get(2, TimeUnit.SECONDS);
+    assertEquals(expected, actual.get());
   }
 }

@@ -36,6 +36,10 @@ public class RedisKeyFactory {
     return build(VERTX, "counters", name);
   }
 
+  String container(String name) {
+    return build(VERTX, "containers", name);
+  }
+
   String topic(String name) {
     return build(VERTX, "topics", name);
   }

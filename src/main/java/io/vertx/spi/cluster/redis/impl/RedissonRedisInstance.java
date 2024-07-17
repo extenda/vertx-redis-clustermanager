@@ -9,6 +9,7 @@ import io.vertx.core.VertxException;
 import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.core.shareddata.Counter;
 import io.vertx.core.shareddata.Lock;
+import io.vertx.spi.cluster.redis.Container;
 import io.vertx.spi.cluster.redis.RedisInstance;
 import io.vertx.spi.cluster.redis.Topic;
 import io.vertx.spi.cluster.redis.config.ClientType;
@@ -17,6 +18,7 @@ import io.vertx.spi.cluster.redis.config.RedisConfig;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisAsyncMap;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisCounter;
 import io.vertx.spi.cluster.redis.impl.shareddata.RedisLock;
+import java.io.Serializable;
 import java.util.Map;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.BlockingQueue;
@@ -160,6 +162,12 @@ public final class RedissonRedisInstance implements RedisInstance {
   @Override
   public <V> BlockingDeque<V> getBlockingDeque(String name) {
     return redisson.getBlockingDeque(keyFactory.build(name));
+  }
+
+  @Override
+  public <V extends Serializable> Container<V> getContainer(String name) {
+    String bucketName = keyFactory.container("name");
+    return new RedisContainer(bucketName, vertx, redisson.getBucket(bucketName));
   }
 
   @Override
