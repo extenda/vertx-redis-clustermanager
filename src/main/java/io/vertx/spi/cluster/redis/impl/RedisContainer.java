@@ -52,10 +52,12 @@ public class RedisContainer<T extends Serializable> implements Container<T> {
     return item == null
         ? fromCompletionStage(bucket.deleteAsync(), vertx.getOrCreateContext())
             .compose(
-                isDeleted ->
-                    isDeleted
-                        ? Future.succeededFuture()
-                        : Future.failedFuture("Failed to clean %s redis container".formatted(name)))
+                isDeleted -> {
+                  if (Boolean.TRUE.equals(isDeleted)) {
+                    return Future.succeededFuture();
+                  }
+                  return Future.failedFuture("Failed to clean %s redis container".formatted(name));
+                })
         : fromCompletionStage(bucket.setAsync(item));
   }
 }
