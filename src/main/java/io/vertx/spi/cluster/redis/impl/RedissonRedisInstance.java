@@ -166,8 +166,8 @@ public final class RedissonRedisInstance implements RedisInstance {
 
   @Override
   public <V extends Serializable> Container<V> getContainer(String name) {
-    String bucketName = keyFactory.container("name");
-    return new RedisContainer<>(bucketName, vertx, redisson.getBucket(bucketName));
+    String bucketName = keyFactory.container(name);
+    return new RedisContainer<>(vertx, redisson.getBucket(bucketName));
   }
 
   @Override

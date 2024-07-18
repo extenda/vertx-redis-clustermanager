@@ -17,12 +17,10 @@ import org.redisson.api.RBucket;
  */
 public class RedisContainer<T extends Serializable> implements Container<T> {
 
-  private final String name;
   private final Vertx vertx;
   private final RBucket<T> bucket;
 
-  public RedisContainer(String name, Vertx vertx, RBucket<T> bucket) {
-    this.name = name;
+  public RedisContainer(Vertx vertx, RBucket<T> bucket) {
     this.vertx = vertx;
     this.bucket = bucket;
   }
@@ -34,11 +32,7 @@ public class RedisContainer<T extends Serializable> implements Container<T> {
 
   @Override
   public void set(T item) {
-    if (item == null) {
-      bucket.delete();
-    } else {
-      bucket.set(item);
-    }
+    bucket.set(item);
   }
 
   @Override
@@ -49,15 +43,6 @@ public class RedisContainer<T extends Serializable> implements Container<T> {
 
   @Override
   public Future<Void> setAsync(T item) {
-    return item == null
-        ? fromCompletionStage(bucket.deleteAsync(), vertx.getOrCreateContext())
-            .compose(
-                isDeleted -> {
-                  if (Boolean.TRUE.equals(isDeleted)) {
-                    return Future.succeededFuture();
-                  }
-                  return Future.failedFuture("Failed to clean %s redis container".formatted(name));
-                })
-        : fromCompletionStage(bucket.setAsync(item));
+    return fromCompletionStage(bucket.setAsync(item));
   }
 }
