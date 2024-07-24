@@ -1,1 +1,1 @@
-io.vertx.spi.cluster.redis.RedisClusterManager
+com.retailsvc.vertx.spi.cluster.redis.RedisClusterManager
