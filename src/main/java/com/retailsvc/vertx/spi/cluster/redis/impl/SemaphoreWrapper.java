@@ -3,6 +3,7 @@ package com.retailsvc.vertx.spi.cluster.redis.impl;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.retailsvc.vertx.spi.cluster.redis.impl.shareddata.RedisLock;
+import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import org.redisson.api.RPermitExpirableSemaphore;
 import org.redisson.api.RSemaphore;
@@ -34,7 +35,7 @@ class SemaphoreWrapper {
       throws InterruptedException {
     RedisLock lock = null;
     if (semaphore != null) {
-      if (semaphore.tryAcquire(waitTime, MILLISECONDS)) {
+      if (semaphore.tryAcquire(Duration.ofMillis(waitTime))) {
         lock = new RedisLock(semaphore, lockReleaseExec);
       }
     } else {

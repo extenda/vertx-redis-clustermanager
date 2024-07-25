@@ -55,27 +55,24 @@ public class ITCustomClassLoaderAsyncMap extends VertxTestBase {
         .sharedData()
         .<String, Object>getAsyncMap("foo")
         .onSuccess(
-            map -> {
-              map.put("test", value)
-                  .onSuccess(
-                      vd -> {
-                        vertices[1]
-                            .sharedData()
-                            .<String, Object>getAsyncMap("foo")
-                            .onSuccess(
-                                map2 -> {
-                                  map2.get("test")
-                                      .onSuccess(
-                                          res -> {
-                                            assertEquals(
-                                                classLoader, res.getClass().getClassLoader());
-                                            assertEquals(value, res);
-                                            testComplete();
-                                          })
-                                      .onFailure(this::fail);
-                                });
-                      });
-            });
+            map ->
+                map.put("test", value)
+                    .onSuccess(
+                        vd ->
+                            vertices[1]
+                                .sharedData()
+                                .<String, Object>getAsyncMap("foo")
+                                .onSuccess(
+                                    map2 ->
+                                        map2.get("test")
+                                            .onSuccess(
+                                                res -> {
+                                                  assertEquals(
+                                                      classLoader, res.getClass().getClassLoader());
+                                                  assertEquals(value, res);
+                                                  testComplete();
+                                                })
+                                            .onFailure(this::fail))));
     await();
   }
 }

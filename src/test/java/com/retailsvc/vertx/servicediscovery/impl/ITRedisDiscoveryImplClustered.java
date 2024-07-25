@@ -7,7 +7,6 @@ import com.retailsvc.vertx.spi.cluster.redis.RedisTestContainerFactory;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
-import io.vertx.core.VertxOptions;
 import io.vertx.core.impl.VertxInternal;
 import io.vertx.servicediscovery.ServiceDiscoveryOptions;
 import io.vertx.servicediscovery.impl.DiscoveryImpl;
@@ -24,10 +23,10 @@ public class ITRedisDiscoveryImplClustered extends DiscoveryImplTestBase {
 
   @Before
   public void beforeEach() {
-    VertxOptions options =
-        new VertxOptions().setClusterManager(RedisClusterManagerTestFactory.newInstance(redis));
     Promise<Vertx> promise = Promise.promise();
-    Vertx.clusteredVertx(options, promise);
+    Vertx.builder()
+        .withClusterManager(RedisClusterManagerTestFactory.newInstance(redis))
+        .buildClustered(promise);
 
     Future<Vertx> future = promise.future().onSuccess(v -> vertx = v);
     await().until(future::succeeded);

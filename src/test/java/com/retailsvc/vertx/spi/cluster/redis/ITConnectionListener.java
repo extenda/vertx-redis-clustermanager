@@ -13,7 +13,6 @@ import com.retailsvc.vertx.spi.cluster.redis.config.RedisConfig;
 import com.retailsvc.vertx.spi.cluster.redis.impl.RedissonConnectionListener;
 import com.retailsvc.vertx.spi.cluster.redis.impl.RedissonContext;
 import io.vertx.core.Vertx;
-import io.vertx.core.VertxOptions;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
@@ -27,14 +26,14 @@ import org.testcontainers.utility.DockerImageName;
 @Testcontainers
 class ITConnectionListener {
 
-  @Container public static GenericContainer<?> REDIS = new FixedRedisContainer();
+  @Container public static GenericContainer<?> redis = new FixedRedisContainer();
 
   private RedisClusterManager clusterManager;
   private Vertx vertx;
   private RedissonContext redissonContext;
 
   private String redisUrl() {
-    return "redis://" + REDIS.getHost() + ":" + REDIS.getFirstMappedPort();
+    return "redis://" + redis.getHost() + ":" + redis.getFirstMappedPort();
   }
 
   private RedissonConnectionListener createVertx(
@@ -52,8 +51,7 @@ class ITConnectionListener {
           }
         };
 
-    VertxOptions options = new VertxOptions().setClusterManager(clusterManager);
-    Vertx.clusteredVertx(options, ar -> vertx = ar.result());
+    Vertx.builder().withClusterManager(clusterManager).buildClustered(ar -> vertx = ar.result());
     await().until(() -> vertx != null);
     return clusterManager.reconnectListener;
   }
@@ -67,8 +65,8 @@ class ITConnectionListener {
   @RepeatedTest(3)
   void reconnectedOnEnabled() {
     ReconnectListener listener = (ReconnectListener) createVertx(true, null);
-    REDIS.stop();
-    await("Redis stopped").until(() -> !REDIS.isRunning());
+    redis.stop();
+    await("Redis stopped").until(() -> !redis.isRunning());
 
     await("Disconnected from Redis").atMost(5, TimeUnit.SECONDS).until(listener.disconnected::get);
 
@@ -81,7 +79,7 @@ class ITConnectionListener {
 
     assertFalse(ping.get());
 
-    REDIS.start();
+    redis.start();
     await("Start reconnect with Redis")
         .atMost(20, TimeUnit.SECONDS)
         .until(() -> listener.reconnectStatus.get() != null);
@@ -96,10 +94,10 @@ class ITConnectionListener {
   void reconnectOnDisabled() {
     RedissonConnectionListener listener = createVertx(false, spy(RedissonConnectionListener.class));
 
-    REDIS.stop();
-    await("Redis stopped").until(() -> !REDIS.isRunning());
+    redis.stop();
+    await("Redis stopped").until(() -> !redis.isRunning());
 
-    REDIS.start();
+    redis.start();
 
     verify(listener, after(500).never()).onConnect();
     verify(listener, after(500).never()).onDisconnect();

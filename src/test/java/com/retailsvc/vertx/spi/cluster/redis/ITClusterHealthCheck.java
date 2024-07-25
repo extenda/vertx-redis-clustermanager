@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.vertx.core.Handler;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
-import io.vertx.core.VertxOptions;
 import io.vertx.ext.healthchecks.Status;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,17 +21,11 @@ class ITClusterHealthCheck {
   @Container public GenericContainer<?> redis = RedisTestContainerFactory.newContainer();
 
   private Vertx vertx;
-  private RedisClusterManager clusterManager;
 
   @BeforeEach
   void beforeEach() {
-    clusterManager = RedisClusterManagerTestFactory.newInstance(redis);
-    VertxOptions options = new VertxOptions().setClusterManager(clusterManager);
-    Vertx.clusteredVertx(
-        options,
-        ar -> {
-          vertx = ar.result();
-        });
+    RedisClusterManager clusterManager = RedisClusterManagerTestFactory.newInstance(redis);
+    Vertx.builder().withClusterManager(clusterManager).buildClustered(ar -> vertx = ar.result());
     await().until(() -> vertx != null);
   }
 
