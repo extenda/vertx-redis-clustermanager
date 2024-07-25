@@ -1,3 +1,4 @@
+![Maven Central Version](https://img.shields.io/maven-central/v/com.retailsvc/vertx-redis-clustermanager?style=flat)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=extenda_vertx-redis-clustermanager&metric=alert_status&token=6d4cad0689d8f37a1f02630ddac30099ded3050c)](https://sonarcloud.io/summary/new_code?id=extenda_vertx-redis-clustermanager)
 
 # vertx-redis-clustermanager
