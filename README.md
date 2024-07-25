@@ -31,7 +31,6 @@ environment variables.
 | redis.connection.port         | REDIS_CONNECTION_PORT         | 6379                                     | The Redis server port.                                                                                           |
 | redis.connection.scheme       | REDIS_CONNECTION_SCHEME       | redis                                    | The Redis scheme. Use <code>redis</code> for TCP and <code>rediss</code> for TLS.                                |
 | redis.key.namespace           | REDIS_KEY_NAMESPACE           |                                          | Optional namespace to prefix all keys with. This is useful if the Redis instance is shared by multiple services. |
-| redis.use.connection.listener | REDIS_USE_CONNECTION_LISTENER | false                                    | Use a connection listener to automatically reconnect to Redis (EXPERIMENTAL).                                    |
 
 ## Development
 
