@@ -1,4 +1,8 @@
+name: commit
 on: push
+
+env:
+  MAVEN_INIT: 'false'
 
 jobs:
   test:
@@ -41,6 +45,11 @@ jobs:
           distribution: temurin
           java-version-file: .java-version
           cache: maven
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_TOKEN
+          gpg-private-key: ${{ secrets.MAVEN_CENTRAL_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
       - name: Create release
         uses: extenda/actions/conventional-release@v0
@@ -54,3 +63,8 @@ jobs:
           args: deploy -DskipTests
           version: ${{ steps.release.outputs.version }}
           service-account-key: ${{ secrets.SECRET_AUTH }}
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}
+          MAVEN_GPG_KEY_NAME: ${{ secrets.MAVEN_CENTRAL_GPG_KEY_NAME }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_CENTRAL_GPG_PASSPHRASE }}

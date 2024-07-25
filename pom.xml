@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.retailsvc</groupId>
@@ -38,20 +38,6 @@
     <tag>HEAD</tag>
   </scm>
 
-  <distributionManagement>
-    <repository>
-      <id>repo.extenda.io</id>
-      <name>Extenda Retail Releases</name>
-      <url>https://repo.extendaretail.com/repository/maven-releases</url>
-    </repository>
-    <snapshotRepository>
-      <uniqueVersion>false</uniqueVersion>
-      <id>repo.extenda.io</id>
-      <name>Extenda Retail Snapshots</name>
-      <url>https://repo.extendaretail.com/repository/maven-snapshots</url>
-    </snapshotRepository>
-  </distributionManagement>
-
   <properties>
     <maven.compiler.source>21</maven.compiler.source>
     <maven.compiler.target>21</maven.compiler.target>
@@ -87,23 +73,6 @@
         <scope>import</scope>
       </dependency>
       <dependency>
-        <groupId>com.google.code.findbugs</groupId>
-        <artifactId>jsr305</artifactId>
-        <version>3.0.2</version>
-      </dependency>
-      <dependency>
-        <!-- http-client vs. guava -->
-        <groupId>com.google.errorprone</groupId>
-        <artifactId>error_prone_annotations</artifactId>
-        <version>2.29.2</version>
-      </dependency>
-      <dependency>
-        <!-- Testcontainers internal convergence -->
-        <groupId>com.google.http-client</groupId>
-        <artifactId>google-http-client</artifactId>
-        <version>1.44.2</version>
-      </dependency>
-      <dependency>
         <groupId>com.jayway.awaitility</groupId>
         <artifactId>awaitility</artifactId>
         <version>1.7.0</version>
@@ -112,24 +81,6 @@
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>
         <version>4.13.2</version>
-      </dependency>
-      <dependency>
-        <!-- testcontainers vs. jib (internal converge) -->
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-compress</artifactId>
-        <version>1.26.2</version>
-      </dependency>
-      <dependency>
-        <!-- Internal testcontainers and jib-core -->
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpclient</artifactId>
-        <version>4.5.14</version>
-      </dependency>
-      <dependency>
-        <!-- google-http-client internals -->
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpcore</artifactId>
-        <version>4.4.16</version>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
@@ -148,17 +99,6 @@
         <version>5.12.0</version>
       </dependency>
       <dependency>
-        <!-- redisson vs awaitility -->
-        <groupId>org.objenesis</groupId>
-        <artifactId>objenesis</artifactId>
-        <version>3.4</version>
-      </dependency>
-      <dependency>
-        <groupId>org.reactivestreams</groupId>
-        <artifactId>reactive-streams</artifactId>
-        <version>1.0.4</version>
-      </dependency>
-      <dependency>
         <groupId>org.redisson</groupId>
         <artifactId>redisson</artifactId>
         <version>3.33.0</version>
@@ -167,12 +107,6 @@
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
         <version>2.0.13</version>
-      </dependency>
-      <dependency>
-        <!-- Redisson internals -->
-        <groupId>org.springframework</groupId>
-        <artifactId>spring-core</artifactId>
-        <version>6.1.11</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -306,9 +240,21 @@
           <execution>
             <id>attach-sources</id>
             <goals>
+              <goal>jar-no-fork</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>3.8.0</version>
+        <executions>
+          <execution>
+            <id>attach-javadocs</id>
+            <goals>
               <goal>jar</goal>
             </goals>
-            <phase>verify</phase>
           </execution>
         </executions>
       </plugin>
@@ -409,7 +355,7 @@
         <configuration>
           <sortProperties>true</sortProperties>
           <sortDependencies>scope,groupId,artifactId</sortDependencies>
-          <indentSchemaLocation>true</indentSchemaLocation>
+          <indentAttribute>schemaLocation</indentAttribute>
           <expandEmptyElements>false</expandEmptyElements>
           <verifyFail>stop</verifyFail>
           <createBackupFile>false</createBackupFile>
@@ -442,6 +388,52 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.sonatype.central</groupId>
+        <artifactId>central-publishing-maven-plugin</artifactId>
+        <version>0.5.0</version>
+        <extensions>true</extensions>
+        <configuration>
+          <publishingServerId>central</publishingServerId>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>sign-artifacts</id>
+      <activation>
+        <property>
+          <name>env.MAVEN_GPG_PASSPHRASE</name>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.4</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+                <phase>verify</phase>
+                <configuration>
+                  <bestPractices>true</bestPractices>
+                  <gpgArguments>
+                    <arg>--pinentry-mode</arg>
+                    <arg>loopback</arg>
+                  </gpgArguments>
+                  <!--suppress UnresolvedMavenProperty -->
+                  <keyname>${env.MAVEN_GPG_KEY_NAME}</keyname>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
