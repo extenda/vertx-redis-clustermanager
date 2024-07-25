@@ -41,15 +41,10 @@ public class RedisConfig {
   /** Lock configuration. */
   private final List<LockConfig> locks = new ArrayList<>();
 
-  /** Use connection listener. */
-  private boolean useConnectionListener;
-
   /** Create the default configuration from existing environment variables. */
   public RedisConfig() {
     defaultEndpoint = RedisConfigProps.getDefaultEndpoint().toASCIIString();
     keyNamespace = RedisConfigProps.getPropertyValue("redis.key.namespace");
-    useConnectionListener =
-        Boolean.parseBoolean(RedisConfigProps.getPropertyValue("redis.use.connection.listener"));
   }
 
   /**
@@ -62,7 +57,6 @@ public class RedisConfig {
     type = other.type;
     keyNamespace = other.keyNamespace;
     endpoints = new ArrayList<>(other.endpoints);
-    useConnectionListener = other.useConnectionListener;
     other.maps.stream().map(MapConfig::new).forEach(maps::add);
     other.locks.stream().map(LockConfig::new).forEach(locks::add);
   }
@@ -220,29 +214,6 @@ public class RedisConfig {
   }
 
   /**
-   * Returns the connection listener flag.
-   *
-   * @return <code>true</code> if a connection listener should be used to track Redis connection
-   *     state.
-   */
-  public boolean isUseConnectionListener() {
-    return useConnectionListener;
-  }
-
-  /**
-   * Set the use connection listener flag. If set, a connection listener will be registered to track
-   * the Redis connection state.
-   *
-   * @param useConnectionListener <code>true</code> to use a connection listener, otherwise <code>
-   *     false</code>
-   * @return fluent self
-   */
-  public RedisConfig setUseConnectionListener(boolean useConnectionListener) {
-    this.useConnectionListener = useConnectionListener;
-    return this;
-  }
-
-  /**
    * Converts this object to JSON notation.
    *
    * @return JSON
@@ -262,15 +233,13 @@ public class RedisConfig {
         && Objects.equals(keyNamespace, that.keyNamespace)
         && defaultEndpoint.equals(that.defaultEndpoint)
         && endpoints.equals(that.endpoints)
-        && useConnectionListener == that.useConnectionListener
         && maps.equals(that.maps)
         && locks.equals(that.locks);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(
-        type, keyNamespace, defaultEndpoint, endpoints, useConnectionListener, maps, locks);
+    return Objects.hash(type, keyNamespace, defaultEndpoint, endpoints, maps, locks);
   }
 
   @Override
