@@ -24,17 +24,23 @@
       <name>Samuel Sjöberg</name>
       <email>samuel.sjoberg@extendaretail.com</email>
       <url>https://github.com/sasjo</url>
+      <organization>Extenda Retail</organization>
+      <organizationUrl>https://extendaretail.com</organizationUrl>
     </developer>
     <developer>
       <id>thced</id>
       <name>Thomas Cederholm</name>
       <email>thomas.cederholm@extendaretail.com</email>
       <url>https://github.com/thced</url>
+      <organization>Extenda Retail</organization>
+      <organizationUrl>https://extendaretail.com</organizationUrl>
     </developer>
   </developers>
 
   <scm>
     <connection>scm:git:https://github.com/extenda/vertx-redis-clustermanager.git</connection>
+    <developerConnection>scm:git:ssh://github.com:extenda/vertx-redis-clustermanager.git</developerConnection>
+    <url>http://github.com/extenda/vertx-redis-clustermanager/tree/master</url>
     <tag>HEAD</tag>
   </scm>
 
