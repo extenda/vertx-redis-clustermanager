@@ -2,7 +2,11 @@ package com.retailsvc.vertx.spi.cluster.redis.impl.codec;
 
 import org.redisson.client.codec.BaseCodec;
 
-/** Class loader aware codec. */
+/**
+ * Class loader aware codec.
+ *
+ * @author sasjo
+ */
 public abstract class ClassLoaderCodec extends BaseCodec {
 
   private final ClassLoader classLoader;

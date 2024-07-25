@@ -6,7 +6,11 @@ import io.vertx.core.json.JsonObject;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-/** Redis configuration for locks and semaphores. */
+/**
+ * Redis configuration for locks and semaphores.
+ *
+ * @author sasjo
+ */
 @DataObject
 @JsonGen
 public final class LockConfig extends KeyConfig<LockConfig> {

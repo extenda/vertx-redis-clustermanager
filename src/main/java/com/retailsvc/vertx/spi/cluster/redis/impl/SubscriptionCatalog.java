@@ -26,6 +26,8 @@ import org.slf4j.LoggerFactory;
  * Manage Vertx Event Bus subscriptions in Redis.
  *
  * <p>Inspired and based upon <code>io.vertx.spi.cluster.hazelcast.impl.SubsMapHelper</code>
+ *
+ * @author sasjo
  */
 public class SubscriptionCatalog {
 
@@ -41,6 +43,13 @@ public class SubscriptionCatalog {
   private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
   private final Throttling throttling;
 
+  /**
+   * Create a new subscription catalog.
+   *
+   * @param redisson the redisson client
+   * @param keyFactory the key factory
+   * @param nodeSelector Vertx node selector
+   */
   public SubscriptionCatalog(
       RedissonClient redisson, RedisKeyFactory keyFactory, NodeSelector nodeSelector) {
     this.nodeSelector = nodeSelector;
@@ -50,6 +59,14 @@ public class SubscriptionCatalog {
     throttling = new Throttling(this::getAndUpdate);
   }
 
+  /**
+   * Create a new subscription catalog.
+   *
+   * @param predecessor the previous subscription catalog
+   * @param redisson the redisson client
+   * @param redisKeyFactory the key factory
+   * @param nodeSelector Vertx node selector
+   */
   public SubscriptionCatalog(
       SubscriptionCatalog predecessor,
       RedissonClient redisson,
@@ -65,6 +82,12 @@ public class SubscriptionCatalog {
     fireRegistrationUpdateEvent(address);
   }
 
+  /**
+   * Get the registered information about handlers for a given address.
+   *
+   * @param address a handler address
+   * @return a list of registered information for the given address
+   */
   public List<RegistrationInfo> get(String address) {
     Lock lock = readWriteLock.readLock();
     lock.lock();
@@ -85,6 +108,12 @@ public class SubscriptionCatalog {
     }
   }
 
+  /**
+   * Store registration information for the cluster manager.
+   *
+   * @param address the address to register
+   * @param registrationInfo the registration information
+   */
   public void put(String address, RegistrationInfo registrationInfo) {
     Lock lock = readWriteLock.readLock();
     lock.lock();
@@ -138,6 +167,12 @@ public class SubscriptionCatalog {
     return newValue;
   }
 
+  /**
+   * Remove a registration from the cluster manager.
+   *
+   * @param address the address to unregister from
+   * @param registrationInfo the registration information to remove
+   */
   public void remove(String address, RegistrationInfo registrationInfo) {
     Lock lock = readWriteLock.readLock();
     lock.lock();
@@ -211,6 +246,7 @@ public class SubscriptionCatalog {
     updated.forEach(topic::publish);
   }
 
+  /** Republish subscriptions that belongs to the current node (in which this is executed). */
   public void republishOwnSubs() {
     Lock writeLock = readWriteLock.writeLock();
     writeLock.lock();
@@ -229,6 +265,7 @@ public class SubscriptionCatalog {
     }
   }
 
+  /** Close the subscription catalog. */
   public void close() {
     topic.removeListener(listenerId);
     throttling.close();

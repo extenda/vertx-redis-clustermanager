@@ -14,12 +14,15 @@ import org.redisson.client.protocol.Encoder;
 /**
  * A Redisson codec for {@link io.vertx.core.shareddata.ClusterSerializable} shared data.
  *
- * @implNote The codec need to support the deprecated {@link
- *     io.vertx.core.shareddata.impl.ClusterSerializable} until it is removed from Vertx.
+ * <p><b>Note:</b> The codec need to support the deprecated {@link
+ * io.vertx.core.shareddata.impl.ClusterSerializable} until it is removed from Vertx.
+ *
+ * @author sasjo
  */
 @SuppressWarnings("deprecation")
 public class ClusterSerializableCodec extends ClassLoaderCodec {
 
+  /** Codec singleton. */
   public static final Codec INSTANCE = new ClusterSerializableCodec();
 
   private final Decoder<Object> decoder =

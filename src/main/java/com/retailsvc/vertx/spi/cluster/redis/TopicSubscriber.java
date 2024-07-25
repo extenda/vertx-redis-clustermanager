@@ -4,6 +4,7 @@ package com.retailsvc.vertx.spi.cluster.redis;
  * A subscriber for a {@link Topic}.
  *
  * @param <T> the type of message
+ * @author sasjo
  */
 @FunctionalInterface
 public interface TopicSubscriber<T> {

@@ -8,7 +8,11 @@ import java.util.concurrent.ExecutorService;
 import org.redisson.api.RPermitExpirableSemaphore;
 import org.redisson.api.RSemaphore;
 
-/** A redis semaphore wrapper that supports lock lease time when configured. */
+/**
+ * A redis semaphore wrapper that supports lock lease time when configured.
+ *
+ * @author sasjo
+ */
 class SemaphoreWrapper {
   private RPermitExpirableSemaphore permitSemaphore;
   private RSemaphore semaphore;

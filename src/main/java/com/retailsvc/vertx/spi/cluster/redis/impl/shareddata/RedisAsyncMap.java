@@ -18,12 +18,19 @@ import org.redisson.api.RMapCache;
  *
  * @param <K> the map key type
  * @param <V> the map value type
+ * @author sasjo
  */
 public class RedisAsyncMap<K, V> implements AsyncMap<K, V> {
 
   private final Vertx vertx;
   private final RMapCache<K, V> map;
 
+  /**
+   * Create a new Redis async map.
+   *
+   * @param vertx the vertx instance
+   * @param map the Redisson map backing the async map
+   */
   public RedisAsyncMap(Vertx vertx, RMapCache<K, V> map) {
     this.vertx = vertx;
     this.map = map;

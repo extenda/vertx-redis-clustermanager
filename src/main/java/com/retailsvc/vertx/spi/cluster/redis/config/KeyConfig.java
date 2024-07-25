@@ -98,6 +98,12 @@ abstract class KeyConfig<T extends KeyConfig<T>> {
     return pattern;
   }
 
+  /**
+   * Check if the given <code>name</code> matches this key by either name or name pattern.
+   *
+   * @param name the name to match against
+   * @return <code>true</code> if this key configuration matches, otherwise <code>false</code>.
+   */
   public boolean matches(String name) {
     if (this.name == null && this.pattern == null) {
       return false;

@@ -10,6 +10,7 @@ import org.redisson.api.RTopic;
  * A Redisson topic with subscription support.
  *
  * @param <T> the type of messages in the topic
+ * @author sasjo
  */
 class RedisTopic<T> implements Topic<T> {
 

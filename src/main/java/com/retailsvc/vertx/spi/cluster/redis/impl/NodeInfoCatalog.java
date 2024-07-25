@@ -16,7 +16,11 @@ import org.redisson.api.map.event.EntryCreatedListener;
 import org.redisson.api.map.event.EntryExpiredListener;
 import org.redisson.api.map.event.EntryRemovedListener;
 
-/** Track Vert.x nodes registration in Redis. */
+/**
+ * Track Vert.x nodes registration in Redis.
+ *
+ * @author sasjo
+ */
 public class NodeInfoCatalog {
 
   /** Node time-to-live in Redis cache. */
@@ -31,6 +35,15 @@ public class NodeInfoCatalog {
       Executors.newSingleThreadExecutor(r -> new Thread(r, "vertx-redis-nodeInfo-thread"));
   private final AtomicReference<NodeInfo> nodeInfo = new AtomicReference<>();
 
+  /**
+   * Create the cluster node info catalog.
+   *
+   * @param vertx the Vertx instance
+   * @param redisson the Redisson client
+   * @param keyFactory the key factory
+   * @param nodeId the unique node ID
+   * @param listener a listener for node registration in the cluster
+   */
   public NodeInfoCatalog(
       Vertx vertx,
       RedissonClient redisson,
@@ -88,6 +101,11 @@ public class NodeInfoCatalog {
     registerNode();
   }
 
+  /**
+   * Remove a node from the cluster.
+   *
+   * @param nodeId the node ID to remove
+   */
   public void remove(String nodeId) {
     nodeInfoMap.fastRemove(nodeId);
   }
@@ -101,6 +119,7 @@ public class NodeInfoCatalog {
     return new ArrayList<>(nodeInfoMap.readAllKeySet());
   }
 
+  /** Close the catalog. */
   public void close() {
     listenerIds.forEach(nodeInfoMap::removeListener);
     setNodeInfo(null);

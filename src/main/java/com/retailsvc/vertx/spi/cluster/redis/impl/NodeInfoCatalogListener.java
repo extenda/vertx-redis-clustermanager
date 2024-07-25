@@ -1,6 +1,10 @@
 package com.retailsvc.vertx.spi.cluster.redis.impl;
 
-/** Listen to changes in the {@link NodeInfoCatalog}. */
+/**
+ * Listen to changes in the {@link NodeInfoCatalog}.
+ *
+ * @author sasjo
+ */
 public interface NodeInfoCatalogListener {
 
   /**
