@@ -14,7 +14,11 @@ import org.redisson.client.protocol.Decoder;
 import org.redisson.client.protocol.Encoder;
 import org.redisson.codec.SerializationCodec;
 
-/** A general purpose Redisson Codec for types supported by shared data maps. */
+/**
+ * A general purpose Redisson Codec for types supported by shared data maps.
+ *
+ * @author sasjo
+ */
 public class RedisMapCodec extends ClassLoaderCodec {
 
   private enum ValueCodec {

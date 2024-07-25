@@ -8,6 +8,7 @@ import io.vertx.core.Future;
  * useful when broadcast behavior is desired or when cluster features are disabled.
  *
  * @param <T> the type of messages in the topic
+ * @author sasjo
  */
 public interface Topic<T> {
   /**

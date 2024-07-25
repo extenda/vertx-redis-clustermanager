@@ -76,14 +76,29 @@ public final class RedissonContext {
     this.config = new RedisConfig(config);
   }
 
+  /**
+   * Get the Redis configuration.
+   *
+   * @return the redis configuration.
+   */
   public RedisConfig config() {
     return config;
   }
 
+  /**
+   * Get the Redis key factory.
+   *
+   * @return the key factory.
+   */
   public RedisKeyFactory keyFactory() {
     return keyFactory;
   }
 
+  /**
+   * Get the Redisson client. The client is lazily created the first time it is accessed.
+   *
+   * @return the Redisson client.
+   */
   public RedissonClient client() {
     try (var ignored = lock(lock)) {
       if (client == null) {
@@ -108,6 +123,7 @@ public final class RedissonContext {
     return lockReleaseExec;
   }
 
+  /** Shutdown the Redisson client. */
   public void shutdown() {
     try (var ignored = lock(lock)) {
       if (client != null) {
@@ -121,6 +137,11 @@ public final class RedissonContext {
     }
   }
 
+  /**
+   * Set a Redisson connection listener.
+   *
+   * @param listener the listener to set
+   */
   public void setConnectionListener(RedissonConnectionListener listener) {
     if (config.isUseConnectionListener()) {
       this.connectionListener.set(listener);

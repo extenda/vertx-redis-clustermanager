@@ -1,6 +1,10 @@
 package com.retailsvc.vertx.spi.cluster.redis.impl;
 
-/** Create keys for Redis objects. */
+/**
+ * Create keys for Redis objects.
+ *
+ * @author sasjo
+ */
 public class RedisKeyFactory {
 
   private static final String VERTX = "__vertx";

@@ -8,9 +8,14 @@ import org.redisson.client.codec.Codec;
 import org.redisson.client.protocol.Decoder;
 import org.redisson.client.protocol.Encoder;
 
-/** A Redisson codec for null values. */
+/**
+ * A Redisson codec for null values.
+ *
+ * @author sasjo
+ */
 public class NullCodec extends BaseCodec {
 
+  /** Codec singleton. */
   public static final Codec INSTANCE = new NullCodec();
 
   private static final Decoder<Object> DECODER = (buf, state) -> null;

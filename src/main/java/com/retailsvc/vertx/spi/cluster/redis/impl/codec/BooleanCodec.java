@@ -7,9 +7,14 @@ import org.redisson.client.codec.Codec;
 import org.redisson.client.protocol.Decoder;
 import org.redisson.client.protocol.Encoder;
 
-/** A Redisson codec for boolean values. */
+/**
+ * A Redisson codec for boolean values.
+ *
+ * @author sasjo
+ */
 public class BooleanCodec extends BaseCodec {
 
+  /** Codec singleton. */
   public static final Codec INSTANCE = new BooleanCodec();
 
   private final Decoder<Object> decoder = (buf, state) -> buf.readBoolean();

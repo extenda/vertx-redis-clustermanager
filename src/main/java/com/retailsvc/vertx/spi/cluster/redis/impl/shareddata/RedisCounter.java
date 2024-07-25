@@ -7,12 +7,22 @@ import io.vertx.core.Vertx;
 import io.vertx.core.shareddata.Counter;
 import org.redisson.api.RAtomicLong;
 
-/** Counter implementation for Redis. */
+/**
+ * Counter implementation for Redis.
+ *
+ * @author sasjo
+ */
 public class RedisCounter implements Counter {
 
   private final Vertx vertx;
   private final RAtomicLong counter;
 
+  /**
+   * Create a Redis counter.
+   *
+   * @param vertx the vertx instance
+   * @param counter the Redisson long backing the counter
+   */
   public RedisCounter(Vertx vertx, RAtomicLong counter) {
     this.vertx = vertx;
     this.counter = counter;
