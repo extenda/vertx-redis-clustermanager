@@ -5,6 +5,7 @@ import static java.util.Collections.unmodifiableList;
 
 import io.vertx.codegen.annotations.DataObject;
 import io.vertx.codegen.annotations.GenIgnore;
+import io.vertx.codegen.json.annotations.JsonGen;
 import io.vertx.core.json.JsonObject;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -18,7 +19,8 @@ import java.util.Optional;
  *
  * @author sasjo
  */
-@DataObject(generateConverter = true)
+@DataObject
+@JsonGen
 public class RedisConfig {
 
   /** The client type. */

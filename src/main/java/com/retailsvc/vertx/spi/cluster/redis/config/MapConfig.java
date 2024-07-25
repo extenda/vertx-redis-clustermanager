@@ -1,6 +1,7 @@
 package com.retailsvc.vertx.spi.cluster.redis.config;
 
 import io.vertx.codegen.annotations.DataObject;
+import io.vertx.codegen.json.annotations.JsonGen;
 import io.vertx.core.json.JsonObject;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -10,7 +11,8 @@ import java.util.regex.Pattern;
  *
  * @author sasjo
  */
-@DataObject(generateConverter = true)
+@DataObject
+@JsonGen
 public final class MapConfig extends KeyConfig<MapConfig> {
   /** The map max size. */
   private int maxSize = 0;
