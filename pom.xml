@@ -40,8 +40,8 @@
   <scm>
     <connection>scm:git:https://github.com/extenda/vertx-redis-clustermanager.git</connection>
     <developerConnection>scm:git:ssh://github.com:extenda/vertx-redis-clustermanager.git</developerConnection>
-    <url>http://github.com/extenda/vertx-redis-clustermanager/tree/master</url>
     <tag>HEAD</tag>
+    <url>http://github.com/extenda/vertx-redis-clustermanager/tree/master</url>
   </scm>
 
   <properties>
