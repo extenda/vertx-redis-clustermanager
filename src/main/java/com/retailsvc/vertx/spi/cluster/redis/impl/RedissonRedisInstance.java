@@ -7,7 +7,6 @@ import com.retailsvc.vertx.spi.cluster.redis.RedisClusterManager;
 import com.retailsvc.vertx.spi.cluster.redis.RedisDataGrid;
 import com.retailsvc.vertx.spi.cluster.redis.RedisInstance;
 import com.retailsvc.vertx.spi.cluster.redis.Topic;
-import com.retailsvc.vertx.spi.cluster.redis.config.ClientType;
 import com.retailsvc.vertx.spi.cluster.redis.config.LockConfig;
 import com.retailsvc.vertx.spi.cluster.redis.config.RedisConfig;
 import com.retailsvc.vertx.spi.cluster.redis.impl.shareddata.RedisAsyncMap;
@@ -65,15 +64,10 @@ public final class RedissonRedisInstance implements RedisInstance {
 
   @Override
   public boolean ping() {
-    if (config.getClientType() == ClientType.STANDALONE) {
-      return redisson.getRedisNodes(RedisNodes.SINGLE).pingAll();
-    } else if (config.getClientType() == ClientType.CLUSTER) {
-      return redisson.getRedisNodes(RedisNodes.CLUSTER).pingAll();
-    } else if (config.getClientType() == ClientType.REPLICATED) {
-      return redisson.getRedisNodes(RedisNodes.CLUSTER).pingAll();
-    }
-    throw new IllegalStateException(
-        "Ping is not supported for client type: " + config.getClientType());
+    return switch (config.getClientType()) {
+      case STANDALONE -> redisson.getRedisNodes(RedisNodes.SINGLE).pingAll();
+      case CLUSTER, REPLICATED -> redisson.getRedisNodes(RedisNodes.CLUSTER).pingAll();
+    };
   }
 
   @Override

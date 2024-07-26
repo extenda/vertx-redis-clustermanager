@@ -2,26 +2,23 @@ package com.retailsvc.vertx.spi.cluster.redis.impl;
 
 import static com.retailsvc.vertx.spi.cluster.redis.impl.CloseableLock.lock;
 
-import com.retailsvc.vertx.spi.cluster.redis.config.ClientType;
 import com.retailsvc.vertx.spi.cluster.redis.config.RedisConfig;
 import com.retailsvc.vertx.spi.cluster.redis.impl.codec.RedisMapCodec;
 import io.vertx.core.shareddata.AsyncMap;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
-import jodd.util.StringUtil;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
+import org.redisson.config.BaseConfig;
 import org.redisson.config.ClusterServersConfig;
 import org.redisson.config.Config;
 import org.redisson.config.ReplicatedServersConfig;
-import org.redisson.config.SingleServerConfig;
-import org.redisson.connection.ConnectionListener;
 
 /**
  * Redisson context with the active Redisson client.
@@ -59,47 +56,26 @@ public final class RedissonContext {
     Objects.requireNonNull(dataClassLoader);
     redisConfig = new Config();
 
-    if (config.getClientType() == ClientType.STANDALONE) {
-      SingleServerConfig singleServerConfig = redisConfig.useSingleServer();
-      singleServerConfig.setAddress(config.getEndpoints().get(0));
-      singleServerConfig.setTimeout(10_000);
-      singleServerConfig.setRetryAttempts(5);
-      singleServerConfig.setRetryInterval(1_000);
-      if (StringUtil.isNotEmpty(config.getUsername())) {
-        singleServerConfig.setUsername(config.getUsername());
-      }
-      if (StringUtil.isNotEmpty(config.getPassword())) {
-        singleServerConfig.setPassword(config.getPassword());
-      }
-    } else if (config.getClientType() == ClientType.CLUSTER) {
-      ClusterServersConfig clusterServersConfig = redisConfig.useClusterServers();
-      clusterServersConfig.setNodeAddresses(config.getEndpoints());
-      clusterServersConfig.setTimeout(10_000);
-      clusterServersConfig.setRetryAttempts(5);
-      clusterServersConfig.setRetryInterval(1_000);
+    BaseConfig<?> serverConfig =
+        switch (config.getClientType()) {
+          case STANDALONE -> redisConfig
+              .useSingleServer()
+              .setAddress(config.getEndpoints().getFirst());
+          case CLUSTER -> {
+            ClusterServersConfig clusterConfig = redisConfig.useClusterServers();
+            clusterConfig.setNodeAddresses(config.getEndpoints());
+            yield clusterConfig;
+          }
+          case REPLICATED -> {
+            ReplicatedServersConfig replicatedConfig = redisConfig.useReplicatedServers();
+            replicatedConfig.setNodeAddresses(config.getEndpoints());
+            yield replicatedConfig;
+          }
+        };
 
-      if (StringUtil.isNotEmpty(config.getUsername())) {
-        clusterServersConfig.setUsername(config.getUsername());
-      }
-      if (StringUtil.isNotEmpty(config.getPassword())) {
-        clusterServersConfig.setPassword(config.getPassword());
-      }
-    } else if (config.getClientType() == ClientType.REPLICATED) {
-      ReplicatedServersConfig replicatedServersConfig = redisConfig.useReplicatedServers();
-      replicatedServersConfig.setNodeAddresses(config.getEndpoints());
-      replicatedServersConfig.setTimeout(10_000);
-      replicatedServersConfig.setRetryAttempts(5);
-      replicatedServersConfig.setRetryInterval(1_000);
-
-      if (StringUtil.isNotEmpty(config.getUsername())) {
-        replicatedServersConfig.setUsername(config.getUsername());
-      }
-      if (StringUtil.isNotEmpty(config.getPassword())) {
-        replicatedServersConfig.setPassword(config.getPassword());
-      }
-    } else {
-     throw new IllegalStateException("ClientType not support: " + config.getClientType());
-    }
+    Optional.ofNullable(config.getUsername()).ifPresent(serverConfig::setUsername);
+    Optional.ofNullable(config.getPassword()).ifPresent(serverConfig::setPassword);
+    Optional.ofNullable(config.getResponseTimeout()).ifPresent(serverConfig::setTimeout);
 
     redisConfig.setCodec(new RedisMapCodec(dataClassLoader));
     if (dataClassLoader != getClass().getClassLoader()) {

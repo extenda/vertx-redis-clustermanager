@@ -93,8 +93,10 @@ class RedisConfigTest {
 
   private RedisConfig complexConfig() {
     return new RedisConfig()
-        .setClientType(ClientType.STANDALONE)
+        .setClientType(ClientType.CLUSTER)
         .addEndpoint("rediss://localhost:8080")
+        .addEndpoint("rediss://localhost:8081")
+        .setResponseTimeout(5000)
         .addMap(new MapConfig("test").setMaxSize(10))
         .addMap(
             new MapConfig(Pattern.compile("^prefix\\.*$"))
@@ -102,6 +104,7 @@ class RedisConfigTest {
                 .setEvictionMode(EvictionMode.LFU))
         .addLock(new LockConfig("test").setLeaseTime(1000))
         .addLock(new LockConfig(Pattern.compile("lock-.*")).setLeaseTime(-1))
+        .setUsername("my-user")
         .setKeyNamespace("test");
   }
 
@@ -145,5 +148,24 @@ class RedisConfigTest {
   void lockConfigToString() {
     String toString = assertDoesNotThrow(() -> new LockConfig("test").toString());
     assertThat(toString).contains("leaseTime=-1");
+  }
+
+  @Test
+  void setUsernameAndPassword() {
+    RedisConfig config = new RedisConfig().setUsername("test").setPassword("secret");
+    assertEquals("test", config.getUsername());
+    assertEquals("secret", config.getPassword());
+  }
+
+  @Test
+  void passwordFromEnv() {
+    try {
+      System.setProperty("redis.connection.password", "prop-secret");
+      RedisConfig config = complexConfig();
+      assertEquals("my-user", config.getUsername());
+      assertEquals("prop-secret", config.getPassword());
+    } finally {
+      System.clearProperty("redis.connection.password");
+    }
   }
 }
