@@ -168,4 +168,19 @@ class RedisConfigTest {
       System.clearProperty("redis.connection.password");
     }
   }
+
+  @Test
+  void objectEquals() {
+    var complex = complexConfig();
+    assertNotEquals(complex, new Object());
+    assertNotEquals(complex, new RedisConfig());
+    assertEquals(complex, complexConfig());
+    assertEquals(complex, complex);
+    assertNotEquals(complex, new RedisConfig(complex).setResponseTimeout(20));
+    assertNotEquals(complex, new RedisConfig(complex).setUsername(null));
+    assertNotEquals(complex, new RedisConfig(complex).setPassword("not null"));
+    assertNotEquals(complex, new RedisConfig(complex).setKeyNamespace("test2"));
+    assertNotEquals(complex, new RedisConfig(complex).addEndpoint("redis://test"));
+    assertNotEquals(complex, new RedisConfig(complex).setClientType(ClientType.REPLICATED));
+  }
 }

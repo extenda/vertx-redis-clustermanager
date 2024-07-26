@@ -132,6 +132,17 @@ public final class RedissonContext {
     return lockReleaseExec;
   }
 
+  /**
+   * Returns the Redisson config populated from the context.
+   *
+   * <p>Visible for tests.
+   *
+   * @return the Redisson config.
+   */
+  Config getRedissonConfig() {
+    return redisConfig;
+  }
+
   /** Shutdown the Redisson client. */
   public void shutdown() {
     try (var ignored = lock(lock)) {

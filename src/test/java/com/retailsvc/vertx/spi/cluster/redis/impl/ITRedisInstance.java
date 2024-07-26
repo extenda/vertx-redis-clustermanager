@@ -110,13 +110,7 @@ class ITRedisInstance {
     await().atMost(2, TimeUnit.SECONDS).until(() -> assertEquals(1, claimCount.get()));
 
     // Try to claim the same lock. It should work after lease time expires.
-    vertx
-        .sharedData()
-        .getLockWithTimeout("forever", 1000)
-        .onFailure(
-            t -> {
-              lockTimeout.set(true);
-            });
+    vertx.sharedData().getLockWithTimeout("forever", 1000).onFailure(t -> lockTimeout.set(true));
 
     await().atMost(2, TimeUnit.SECONDS).until(lockTimeout::get);
   }
@@ -129,10 +123,7 @@ class ITRedisInstance {
     vertx
         .sharedData()
         .getLockWithTimeout("leaseTime", 1000)
-        .onSuccess(
-            lock -> {
-              claimCount.incrementAndGet();
-            });
+        .onSuccess(lock -> claimCount.incrementAndGet());
     await().atMost(2, TimeUnit.SECONDS).until(() -> assertEquals(1, claimCount.get()));
 
     // Try to claim the same lock. It should work after lease time expires.
