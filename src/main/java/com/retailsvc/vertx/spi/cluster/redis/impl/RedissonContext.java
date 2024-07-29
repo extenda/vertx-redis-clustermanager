@@ -2,11 +2,11 @@ package com.retailsvc.vertx.spi.cluster.redis.impl;
 
 import static com.retailsvc.vertx.spi.cluster.redis.impl.CloseableLock.lock;
 
-import com.retailsvc.vertx.spi.cluster.redis.config.ClientType;
 import com.retailsvc.vertx.spi.cluster.redis.config.RedisConfig;
 import com.retailsvc.vertx.spi.cluster.redis.impl.codec.RedisMapCodec;
 import io.vertx.core.shareddata.AsyncMap;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
@@ -15,7 +15,10 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
+import org.redisson.config.BaseConfig;
+import org.redisson.config.ClusterServersConfig;
 import org.redisson.config.Config;
+import org.redisson.config.ReplicatedServersConfig;
 
 /**
  * Redisson context with the active Redisson client.
@@ -53,11 +56,26 @@ public final class RedissonContext {
     Objects.requireNonNull(dataClassLoader);
     redisConfig = new Config();
 
-    if (config.getClientType() == ClientType.STANDALONE) {
-      redisConfig.useSingleServer().setAddress(config.getEndpoints().getFirst());
-    } else {
-      throw new IllegalStateException("RedissonContext only supports STANDALONE client");
-    }
+    BaseConfig<?> serverConfig =
+        switch (config.getClientType()) {
+          case STANDALONE -> redisConfig
+              .useSingleServer()
+              .setAddress(config.getEndpoints().getFirst());
+          case CLUSTER -> {
+            ClusterServersConfig clusterConfig = redisConfig.useClusterServers();
+            clusterConfig.setNodeAddresses(config.getEndpoints());
+            yield clusterConfig;
+          }
+          case REPLICATED -> {
+            ReplicatedServersConfig replicatedConfig = redisConfig.useReplicatedServers();
+            replicatedConfig.setNodeAddresses(config.getEndpoints());
+            yield replicatedConfig;
+          }
+        };
+
+    Optional.ofNullable(config.getUsername()).ifPresent(serverConfig::setUsername);
+    Optional.ofNullable(config.getPassword()).ifPresent(serverConfig::setPassword);
+    Optional.ofNullable(config.getResponseTimeout()).ifPresent(serverConfig::setTimeout);
 
     redisConfig.setCodec(new RedisMapCodec(dataClassLoader));
     if (dataClassLoader != getClass().getClassLoader()) {
@@ -112,6 +130,17 @@ public final class RedissonContext {
 
   ExecutorService lockReleaseExec() {
     return lockReleaseExec;
+  }
+
+  /**
+   * Returns the Redisson config populated from the context.
+   *
+   * <p>Visible for tests.
+   *
+   * @return the Redisson config.
+   */
+  Config getRedissonConfig() {
+    return redisConfig;
   }
 
   /** Shutdown the Redisson client. */

@@ -29,6 +29,15 @@ public class RedisConfig {
   /** Redis key namespace. */
   private String keyNamespace;
 
+  /** Redis connection username. */
+  private String username;
+
+  /** Redis connection password, */
+  private String password;
+
+  /** Redis response timeout. */
+  private Integer responseTimeout;
+
   /** Default Redis URL. */
   private final String defaultEndpoint;
 
@@ -45,6 +54,8 @@ public class RedisConfig {
   public RedisConfig() {
     defaultEndpoint = RedisConfigProps.getDefaultEndpoint().toASCIIString();
     keyNamespace = RedisConfigProps.getPropertyValue("redis.key.namespace");
+    username = RedisConfigProps.getPropertyValue("redis.connection.username", null);
+    password = RedisConfigProps.getPropertyValue("redis.connection.password", null);
   }
 
   /**
@@ -56,6 +67,9 @@ public class RedisConfig {
     defaultEndpoint = other.defaultEndpoint;
     type = other.type;
     keyNamespace = other.keyNamespace;
+    username = other.username;
+    password = other.password;
+    responseTimeout = other.responseTimeout;
     endpoints = new ArrayList<>(other.endpoints);
     other.maps.stream().map(MapConfig::new).forEach(maps::add);
     other.locks.stream().map(LockConfig::new).forEach(locks::add);
@@ -112,6 +126,72 @@ public class RedisConfig {
   }
 
   /**
+   * Returns the username used when connecting to Redis.
+   *
+   * @return the username to use when connecting to Redis or <code>null</code> to not use a username
+   */
+  public String getUsername() {
+    return username;
+  }
+
+  /**
+   * Set the username to use when connecting to Redis.
+   *
+   * <p>Default value: <code>null</code>
+   *
+   * @param username the username to use
+   * @return fluent self
+   */
+  public RedisConfig setUsername(String username) {
+    this.username = username;
+    return this;
+  }
+
+  /**
+   * Returns the password used when connecting to Redis.
+   *
+   * @return the password to use when connecting to Redis or <code>null</code> to not use a password
+   */
+  public String getPassword() {
+    return password;
+  }
+
+  /**
+   * Set the password to use when connecting to Redis.
+   *
+   * <p>Default value: <code>null</code>
+   *
+   * @param password the password to use
+   * @return fluent self
+   */
+  public RedisConfig setPassword(String password) {
+    this.password = password;
+    return this;
+  }
+
+  /**
+   * Set the Redis server response timeout. Starts to countdown when Redis command has been
+   * successfully sent. If not set, a default value will be used.
+   *
+   * @param responseTimeout the response timeout in milliseconds
+   * @return fluent self
+   */
+  public RedisConfig setResponseTimeout(Integer responseTimeout) {
+    this.responseTimeout = responseTimeout;
+    return this;
+  }
+
+  /**
+   * Get the Redis server response timeout. Starts to countdown when Redis command has been
+   * successfully sent.
+   *
+   * @return the response timeout to use or <code>null</code> to use a default response timeout
+   */
+  public Integer getResponseTimeout() {
+    return responseTimeout;
+  }
+
+  /**
    * Add a client endpoint.
    *
    * @param redisUrl the endpoint connection URL to add
@@ -139,7 +219,7 @@ public class RedisConfig {
       return singletonList(defaultEndpoint);
     }
     if (type == ClientType.STANDALONE) {
-      return singletonList(endpoints.get(0));
+      return singletonList(endpoints.getFirst());
     }
     return unmodifiableList(endpoints);
   }
@@ -226,20 +306,35 @@ public class RedisConfig {
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
-    RedisConfig that = (RedisConfig) o;
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof RedisConfig that)) {
+      return false;
+    }
     return type == that.type
         && Objects.equals(keyNamespace, that.keyNamespace)
-        && defaultEndpoint.equals(that.defaultEndpoint)
-        && endpoints.equals(that.endpoints)
-        && maps.equals(that.maps)
-        && locks.equals(that.locks);
+        && Objects.equals(username, that.username)
+        && Objects.equals(password, that.password)
+        && Objects.equals(responseTimeout, that.responseTimeout)
+        && Objects.equals(defaultEndpoint, that.defaultEndpoint)
+        && Objects.equals(endpoints, that.endpoints)
+        && Objects.equals(maps, that.maps)
+        && Objects.equals(locks, that.locks);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(type, keyNamespace, defaultEndpoint, endpoints, maps, locks);
+    return Objects.hash(
+        type,
+        keyNamespace,
+        username,
+        password,
+        responseTimeout,
+        defaultEndpoint,
+        endpoints,
+        maps,
+        locks);
   }
 
   @Override
