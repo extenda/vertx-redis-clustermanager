@@ -6,9 +6,9 @@
 A Vert.x ClusterManager for Redis. The cluster manager allows teams to use Redis as a drop-in replacement for Hazelcast
 to run Vert.x in clustered high availability mode.
 
-The cluster manager is proven in production with [Redis CE](redis-ce)
-and [Google Cloud MemoryStore for Redis](memorystore) and can also be used
-with, [AWS ElastiCache Cluster](elasticache), [Amazon MemoryDB](memorydb) and [Azure Redis Cache](azure).
+The cluster manager is proven in production with [Redis CE][redis-ce]
+and [Google Cloud MemoryStore for Redis][memorystore] and can also be used
+with [AWS ElastiCache Cluster][elasticache], [Amazon MemoryDB][memorydb] and [Azure Redis Cache][azure].
 
 [redis-ce]: https://redis.io/docs/latest/operate/oss_and_stack/
 [memorystore]: https://cloud.google.com/memorystore/docs/redis
