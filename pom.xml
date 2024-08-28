@@ -107,7 +107,7 @@
       <dependency>
         <groupId>org.redisson</groupId>
         <artifactId>redisson</artifactId>
-        <version>3.34.1</version>
+        <version>3.35.0</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
