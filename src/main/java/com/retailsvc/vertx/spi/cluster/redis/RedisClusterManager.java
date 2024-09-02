@@ -169,7 +169,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
               if (active.compareAndSet(false, true)) {
                 try (var ignored = CloseableLock.lock(lock)) {
                   nodeId = UUID.randomUUID().toString();
-                  log.debug("Join cluster as {}", nodeId);
+                  log.info("Join cluster as {}", nodeId);
                   dataGrid = new RedissonRedisInstance(vertx, redissonContext);
                   createCatalogs(redissonContext.client());
                 }
@@ -261,7 +261,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
               // the cluster, typically memberAdded and memberRemoved.
               if (active.compareAndSet(true, false)) {
                 try (var ignored = CloseableLock.lock(lock)) {
-                  log.debug("Leave custer as {}", nodeId);
+                  log.info("Leave custer as {}", nodeId);
 
                   // Stop catalog services.
                   closeCatalogs();
