@@ -5,7 +5,7 @@
 
   <groupId>com.retailsvc</groupId>
   <artifactId>vertx-redis-clustermanager</artifactId>
-  <version>0.0.1-local</version>
+  <version>4.4.9</version>
 
   <name>Vert.x Redis ClusterManager</name>
   <description>Vert.x ClusterManager for Redis.</description>
