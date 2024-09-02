@@ -1,18 +1,17 @@
 package com.retailsvc.vertx.spi.cluster.redis.config;
 
-import io.vertx.codegen.annotations.DataObject;
-import io.vertx.codegen.json.annotations.JsonGen;
-import io.vertx.core.json.JsonObject;
 import java.util.Objects;
 import java.util.regex.Pattern;
+
+import io.vertx.codegen.annotations.DataObject;
+import io.vertx.core.json.JsonObject;
 
 /**
  * Redis configuration for locks and semaphores.
  *
  * @author sasjo
  */
-@DataObject
-@JsonGen
+@DataObject(generateConverter = true)
 public final class LockConfig extends KeyConfig<LockConfig> {
 
   /** The lease time. */

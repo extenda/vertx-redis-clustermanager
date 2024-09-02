@@ -5,15 +5,17 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.vertx.core.Handler;
-import io.vertx.core.Promise;
-import io.vertx.core.Vertx;
-import io.vertx.ext.healthchecks.Status;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+
+import io.vertx.core.Handler;
+import io.vertx.core.Promise;
+import io.vertx.core.Vertx;
+import io.vertx.core.VertxOptions;
+import io.vertx.ext.healthchecks.Status;
 
 @Testcontainers
 class ITClusterHealthCheck {
@@ -23,9 +25,10 @@ class ITClusterHealthCheck {
   private Vertx vertx;
 
   @BeforeEach
-  void beforeEach() {
+  void beforeEach() throws Exception {
     RedisClusterManager clusterManager = RedisClusterManagerTestFactory.newInstance(redis);
-    Vertx.builder().withClusterManager(clusterManager).buildClustered(ar -> vertx = ar.result());
+    
+    Vertx.clusteredVertx(new VertxOptions().setClusterManager(clusterManager)).onComplete(ar -> vertx = ar.result());
     await().until(() -> vertx != null);
   }
 

@@ -60,7 +60,7 @@ public final class RedissonContext {
         switch (config.getClientType()) {
           case STANDALONE -> redisConfig
               .useSingleServer()
-              .setAddress(config.getEndpoints().getFirst());
+              .setAddress(config.getEndpoints().get(0));
           case CLUSTER -> {
             ClusterServersConfig clusterConfig = redisConfig.useClusterServers();
             clusterConfig.setNodeAddresses(config.getEndpoints());
@@ -113,8 +113,7 @@ public final class RedissonContext {
       if (client == null) {
         client = Redisson.create(redisConfig);
         lockReleaseExec =
-            Executors.newCachedThreadPool(
-                Thread.ofPlatform().name("vertx-redis-service-release-lock-thread", 1).factory());
+            Executors.newCachedThreadPool(r -> new Thread(r, "vertx-redis-service-release-lock-thread"));
       }
       return client;
     }

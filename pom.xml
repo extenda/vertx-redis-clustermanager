@@ -9,7 +9,7 @@
 
   <name>Vert.x Redis ClusterManager</name>
   <description>Vert.x ClusterManager for Redis.</description>
-  <url>https://github.com/extenda/vertx-redis-clustermanager</url>
+  <url>https://github.com/wjw465150/vertx-redis-clustermanager</url>
 
   <licenses>
     <license>
@@ -21,32 +21,24 @@
   <developers>
     <developer>
       <id>sasjo</id>
-      <name>Samuel Sjöberg</name>
-      <email>samuel.sjoberg@extendaretail.com</email>
-      <url>https://github.com/sasjo</url>
-      <organization>Extenda Retail</organization>
-      <organizationUrl>https://extendaretail.com</organizationUrl>
-    </developer>
-    <developer>
-      <id>thced</id>
-      <name>Thomas Cederholm</name>
-      <email>thomas.cederholm@extendaretail.com</email>
-      <url>https://github.com/thced</url>
-      <organization>Extenda Retail</organization>
-      <organizationUrl>https://extendaretail.com</organizationUrl>
+      <name>wjw65150</name>
+      <email>wjw465150@gmail.com</email>
+      <url>https://github.com/wjw65150</url>
+      <organization>WStone</organization>
+      <organizationUrl>https://github.com/wjw65150</organizationUrl>
     </developer>
   </developers>
 
   <scm>
-    <connection>scm:git:https://github.com/extenda/vertx-redis-clustermanager.git</connection>
-    <developerConnection>scm:git:ssh://github.com:extenda/vertx-redis-clustermanager.git</developerConnection>
+    <connection>scm:git:https://github.com/wjw65150/vertx-redis-clustermanager.git</connection>
+    <developerConnection>scm:git:ssh://github.com:wjw65150/vertx-redis-clustermanager.git</developerConnection>
     <tag>HEAD</tag>
-    <url>http://github.com/extenda/vertx-redis-clustermanager/tree/master</url>
+    <url>http://github.com/wjw65150/vertx-redis-clustermanager/tree/master</url>
   </scm>
 
   <properties>
-    <maven.compiler.source>21</maven.compiler.source>
-    <maven.compiler.target>21</maven.compiler.target>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
@@ -60,7 +52,7 @@
       <dependency>
         <groupId>io.vertx</groupId>
         <artifactId>vertx-stack-depchain</artifactId>
-        <version>4.5.9</version>
+        <version>4.4.9</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

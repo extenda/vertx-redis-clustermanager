@@ -10,6 +10,22 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+
 import com.jayway.awaitility.Duration;
 import com.retailsvc.vertx.spi.cluster.redis.RedisClusterManager;
 import com.retailsvc.vertx.spi.cluster.redis.RedisDataGrid;
@@ -20,23 +36,11 @@ import com.retailsvc.vertx.spi.cluster.redis.TopicSubscriber;
 import com.retailsvc.vertx.spi.cluster.redis.config.LockConfig;
 import com.retailsvc.vertx.spi.cluster.redis.config.MapConfig;
 import com.retailsvc.vertx.spi.cluster.redis.config.RedisConfig;
+
 import io.vertx.core.Vertx;
+import io.vertx.core.VertxOptions;
 import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.core.shareddata.Counter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** Test redis specific behavior and data type configurations. */
 @Testcontainers
@@ -57,7 +61,8 @@ class ITRedisInstance {
             .addMap(new MapConfig("maxSize").setMaxSize(3))
             .addLock(new LockConfig("leaseTime").setLeaseTime(1000));
     clusterManager = new RedisClusterManager(config);
-    Vertx.builder().withClusterManager(clusterManager).buildClustered(ar -> vertx = ar.result());
+    
+    Vertx.clusteredVertx(new VertxOptions().setClusterManager(clusterManager)).onComplete(ar -> vertx = ar.result());
     await().until(() -> vertx != null);
   }
 

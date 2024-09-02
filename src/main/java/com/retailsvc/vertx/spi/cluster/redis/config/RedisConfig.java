@@ -3,10 +3,6 @@ package com.retailsvc.vertx.spi.cluster.redis.config;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.unmodifiableList;
 
-import io.vertx.codegen.annotations.DataObject;
-import io.vertx.codegen.annotations.GenIgnore;
-import io.vertx.codegen.json.annotations.JsonGen;
-import io.vertx.core.json.JsonObject;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -14,13 +10,16 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import io.vertx.codegen.annotations.DataObject;
+import io.vertx.codegen.annotations.GenIgnore;
+import io.vertx.core.json.JsonObject;
+
 /**
  * Redis cluster manager configuration.
  *
  * @author sasjo
  */
-@DataObject
-@JsonGen
+@DataObject(generateConverter = true)
 public class RedisConfig {
 
   /** The client type. */
@@ -219,7 +218,7 @@ public class RedisConfig {
       return singletonList(defaultEndpoint);
     }
     if (type == ClientType.STANDALONE) {
-      return singletonList(endpoints.getFirst());
+      return singletonList(endpoints.get(0));
     }
     return unmodifiableList(endpoints);
   }
