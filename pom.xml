@@ -67,7 +67,7 @@
       <dependency>
         <groupId>org.junit</groupId>
         <artifactId>junit-bom</artifactId>
-        <version>5.11.3</version>
+        <version>5.11.4</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -107,7 +107,7 @@
       <dependency>
         <groupId>org.redisson</groupId>
         <artifactId>redisson</artifactId>
-        <version>3.40.1</version>
+        <version>3.41.0</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
@@ -140,7 +140,7 @@
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
-      <version>1.5.12</version>
+      <version>1.5.15</version>
       <scope>test</scope>
     </dependency>
     <dependency>
