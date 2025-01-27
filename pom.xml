@@ -60,7 +60,7 @@
       <dependency>
         <groupId>io.vertx</groupId>
         <artifactId>vertx-stack-depchain</artifactId>
-        <version>4.5.11</version>
+        <version>4.5.12</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -107,7 +107,7 @@
       <dependency>
         <groupId>org.redisson</groupId>
         <artifactId>redisson</artifactId>
-        <version>3.43.0</version>
+        <version>3.44.0</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
