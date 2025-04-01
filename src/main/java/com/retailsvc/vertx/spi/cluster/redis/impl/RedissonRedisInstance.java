@@ -18,6 +18,7 @@ import io.vertx.core.VertxException;
 import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.core.shareddata.Counter;
 import io.vertx.core.shareddata.Lock;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.BlockingQueue;
@@ -160,6 +161,11 @@ public final class RedissonRedisInstance implements RedisInstance {
   @Override
   public <V> BlockingDeque<V> getBlockingDeque(String name) {
     return redisson.getBlockingDeque(keyFactory.build(name));
+  }
+
+  @Override
+  public <V> List<V> getList(String name) {
+    return redisson.getList(keyFactory.build(name));
   }
 
   @Override

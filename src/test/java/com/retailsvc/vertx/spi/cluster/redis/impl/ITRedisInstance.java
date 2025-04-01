@@ -201,6 +201,25 @@ class ITRedisInstance {
   }
 
   @Test
+  void list() {
+    List<String> list = redisInstance().getList("testList");
+    assertNotNull(list);
+    list.add("1");
+    list.add("2");
+
+    assertThat(list.get(0)).isEqualTo("1");
+    assertThat(list.get(1)).isEqualTo("2");
+    assertThat(list.size()).isEqualTo(2);
+
+    list = redisInstance().getList("testList2");
+    assertNotNull(list);
+    list.add("100");
+
+    assertThat(list.getFirst()).isEqualTo("100");
+    assertThat(list.size()).isEqualTo(1);
+  }
+
+  @Test
   void topicWithSubscription() {
     Topic<String> topic = redisInstance().getTopic(String.class, "testTopic");
     List<String> messages = new CopyOnWriteArrayList<>();
