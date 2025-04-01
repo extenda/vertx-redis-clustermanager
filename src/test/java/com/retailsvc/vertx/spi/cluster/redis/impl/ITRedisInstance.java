@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mock;
 
 import com.jayway.awaitility.Duration;
 import com.retailsvc.vertx.spi.cluster.redis.RedisClusterManager;
@@ -198,6 +200,29 @@ class ITRedisInstance {
 
     assertThat(deque.pop()).isEqualTo("2");
     assertThat(deque.pop()).isEqualTo("1");
+  }
+
+  @Test
+  void list() {
+    List<String> list = redisInstance().getList("testList");
+    assertNotNull(list);
+    list.add("1");
+    list.add("2");
+
+    assertThat(list.get(0)).isEqualTo("1");
+    assertThat(list.get(1)).isEqualTo("2");
+    assertThat(list).hasSize(2);
+
+    list = redisInstance().getList("testList2");
+    assertNotNull(list);
+    list.add("100");
+
+    assertThat(list.getFirst()).isEqualTo("100");
+    assertThat(list).hasSize(1);
+
+    var redisDataGrid = mock(RedisDataGrid.class, CALLS_REAL_METHODS);
+
+    assertThrows(UnsupportedOperationException.class, () -> redisDataGrid.getList("testList"));
   }
 
   @Test
