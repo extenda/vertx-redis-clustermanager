@@ -60,7 +60,7 @@
       <dependency>
         <groupId>io.vertx</groupId>
         <artifactId>vertx-stack-depchain</artifactId>
-        <version>4.5.13</version>
+        <version>4.5.14</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -102,7 +102,7 @@
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-junit-jupiter</artifactId>
-        <version>5.16.1</version>
+        <version>5.17.0</version>
       </dependency>
       <dependency>
         <groupId>org.redisson</groupId>
@@ -268,7 +268,7 @@
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.12</version>
+        <version>0.8.13</version>
         <configuration>
           <propertyName>jacoco.argLine</propertyName>
         </configuration>
