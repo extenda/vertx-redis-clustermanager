@@ -125,12 +125,12 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public void setNodeInfo(NodeInfo nodeInfo, Promise<Void> promise) {
-    try (var ignored = CloseableLock.lock(lock)) {
-      this.nodeInfo = nodeInfo;
-    }
     vertx
         .<Void>executeBlocking(
             () -> {
+              try (var ignored = CloseableLock.lock(lock)) {
+                this.nodeInfo = nodeInfo;
+              }
               nodeInfoCatalog.setNodeInfo(nodeInfo);
               return null;
             },
@@ -140,7 +140,15 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public NodeInfo getNodeInfo() {
-    try (var ignored = CloseableLock.lock(lock)) {
+    if (lock.tryLock()) {
+      try {
+        return nodeInfo;
+      } finally {
+        lock.unlock();
+      }
+    } else {
+      // If we can't acquire the lock immediately, return the current value
+      // This is a trade-off between consistency and non-blocking behavior
       return nodeInfo;
     }
   }
@@ -196,60 +204,68 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   private String logId(String nodeId) {
-    try (var ignored = CloseableLock.lock(lock)) {
-      return nodeId.equals(this.nodeId) ? "%s (self)".formatted(nodeId) : nodeId;
-    }
+    return nodeId.equals(this.nodeId) ? "%s (self)".formatted(nodeId) : nodeId;
   }
 
   @Override
   public void memberAdded(String nodeId) {
-    try (var ignored = CloseableLock.lock(lock)) {
-      if (isActive()) {
-        if (log.isDebugEnabled()) {
-          log.debug("Add member [{}]", logId(nodeId));
-        }
-        if (nodeListener != null) {
-          nodeListener.nodeAdded(nodeId);
-        }
-        log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
-      }
-    }
+    vertx.executeBlocking(
+        () -> {
+          try (var ignored = CloseableLock.lock(lock)) {
+            if (isActive()) {
+              if (log.isDebugEnabled()) {
+                log.debug("Add member [{}]", logId(nodeId));
+              }
+              if (nodeListener != null) {
+                nodeListener.nodeAdded(nodeId);
+              }
+              log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
+            }
+          }
+          return null;
+        },
+        false);
   }
 
   @Override
   public void memberRemoved(String nodeId) {
-    try (var ignored = CloseableLock.lock(lock)) {
-      if (isActive()) {
-        if (log.isDebugEnabled()) {
-          log.debug("Remove member [{}]", logId(nodeId));
-        }
-        subscriptionCatalog.removeAllForNodes(singleton(nodeId));
+    vertx.executeBlocking(
+        () -> {
+          try (var ignored = CloseableLock.lock(lock)) {
+            if (isActive()) {
+              if (log.isDebugEnabled()) {
+                log.debug("Remove member [{}]", logId(nodeId));
+              }
+              subscriptionCatalog.removeAllForNodes(singleton(nodeId));
 
-        log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
+              log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
 
-        // Register self again.
-        registerSelfAgain();
+              // Register self again.
+              registerSelfAgain();
 
-        if (nodeListener != null) {
-          nodeListener.nodeLeft(nodeId);
-        }
-      }
-    }
+              if (nodeListener != null) {
+                nodeListener.nodeLeft(nodeId);
+              }
+            }
+          }
+          return null;
+        },
+        false);
   }
 
   /** Re-register self in the cluster. */
   private void registerSelfAgain() {
-    try (var ignored = CloseableLock.lock(lock)) {
-      nodeInfoCatalog.setNodeInfo(getNodeInfo());
-      nodeSelector.registrationsLost();
+    vertx.executeBlocking(
+        () -> {
+          try (var ignored = CloseableLock.lock(lock)) {
+            nodeInfoCatalog.setNodeInfo(getNodeInfo());
+            nodeSelector.registrationsLost();
+          }
 
-      vertx.executeBlocking(
-          () -> {
-            subscriptionCatalog.republishOwnSubs();
-            return null;
-          },
-          false);
-    }
+          subscriptionCatalog.republishOwnSubs();
+          return null;
+        },
+        false);
   }
 
   @Override
