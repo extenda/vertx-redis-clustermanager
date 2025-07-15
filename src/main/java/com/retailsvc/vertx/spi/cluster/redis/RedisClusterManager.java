@@ -125,9 +125,12 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public void setNodeInfo(NodeInfo nodeInfo, Promise<Void> promise) {
+    log.trace("[{}] Attempting to acquire lock {} in setNodeInfo", Thread.currentThread().getName(), System.identityHashCode(lock));
     try (var ignored = CloseableLock.lock(lock)) {
+      log.trace("[{}] Acquired lock {} in setNodeInfo", Thread.currentThread().getName(), System.identityHashCode(lock));
       this.nodeInfo = nodeInfo;
     }
+    log.trace("[{}] Released lock {} in setNodeInfo", Thread.currentThread().getName(), System.identityHashCode(lock));
     vertx
         .<Void>executeBlocking(
             () -> {
@@ -140,8 +143,12 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public NodeInfo getNodeInfo() {
+    log.trace("[{}] Attempting to acquire lock {} in getNodeInfo", Thread.currentThread().getName(), System.identityHashCode(lock));
     try (var ignored = CloseableLock.lock(lock)) {
+      log.trace("[{}] Acquired lock {} in getNodeInfo", Thread.currentThread().getName(), System.identityHashCode(lock));
       return nodeInfo;
+    } finally {
+      log.trace("[{}] Released lock {} in getNodeInfo", Thread.currentThread().getName(), System.identityHashCode(lock));
     }
   }
 
@@ -163,19 +170,22 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public void join(Promise<Void> promise) {
+    log.trace("[{}] Attempting to acquire lock {} in join", Thread.currentThread().getName(), System.identityHashCode(lock));
     vertx
         .<Void>executeBlocking(
             () -> {
-              if (active.compareAndSet(false, true)) {
-                try (var ignored = CloseableLock.lock(lock)) {
+              try (var ignored = CloseableLock.lock(lock)) {
+                log.trace("[{}] Acquired lock {} in join", Thread.currentThread().getName(), System.identityHashCode(lock));
+                if (active.compareAndSet(false, true)) {
                   nodeId = UUID.randomUUID().toString();
                   log.debug("Join cluster as {}", nodeId);
                   dataGrid = new RedissonRedisInstance(vertx, redissonContext);
                   createCatalogs(redissonContext.client());
+                } else {
+                  log.warn("Already activated, nodeId: {}", nodeId);
                 }
-              } else {
-                log.warn("Already activated, nodeId: {}", nodeId);
               }
+              log.trace("[{}] Released lock {} in join", Thread.currentThread().getName(), System.identityHashCode(lock));
               return null;
             })
         .onComplete(promise);
@@ -196,14 +206,20 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   private String logId(String nodeId) {
+    log.trace("[{}] Attempting to acquire lock {} in logId", Thread.currentThread().getName(), System.identityHashCode(lock));
     try (var ignored = CloseableLock.lock(lock)) {
+      log.trace("[{}] Acquired lock {} in logId", Thread.currentThread().getName(), System.identityHashCode(lock));
       return nodeId.equals(this.nodeId) ? "%s (self)".formatted(nodeId) : nodeId;
+    } finally {
+      log.trace("[{}] Released lock {} in logId", Thread.currentThread().getName(), System.identityHashCode(lock));
     }
   }
 
   @Override
   public void memberAdded(String nodeId) {
+    log.trace("[{}] Attempting to acquire lock {} in memberAdded", Thread.currentThread().getName(), System.identityHashCode(lock));
     try (var ignored = CloseableLock.lock(lock)) {
+      log.trace("[{}] Acquired lock {} in memberAdded", Thread.currentThread().getName(), System.identityHashCode(lock));
       if (isActive()) {
         if (log.isDebugEnabled()) {
           log.debug("Add member [{}]", logId(nodeId));
@@ -213,12 +229,16 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
         }
         log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
       }
+    } finally {
+      log.trace("[{}] Released lock {} in memberAdded", Thread.currentThread().getName(), System.identityHashCode(lock));
     }
   }
 
   @Override
   public void memberRemoved(String nodeId) {
+    log.trace("[{}] Attempting to acquire lock {} in memberRemoved", Thread.currentThread().getName(), System.identityHashCode(lock));
     try (var ignored = CloseableLock.lock(lock)) {
+      log.trace("[{}] Acquired lock {} in memberRemoved", Thread.currentThread().getName(), System.identityHashCode(lock));
       if (isActive()) {
         if (log.isDebugEnabled()) {
           log.debug("Remove member [{}]", logId(nodeId));
@@ -234,33 +254,35 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
           nodeListener.nodeLeft(nodeId);
         }
       }
+    } finally {
+      log.trace("[{}] Released lock {} in memberRemoved", Thread.currentThread().getName(), System.identityHashCode(lock));
     }
   }
 
   /** Re-register self in the cluster. */
   private void registerSelfAgain() {
+    log.trace("[{}] Attempting to acquire lock {} in registerSelfAgain", Thread.currentThread().getName(), System.identityHashCode(lock));
     try (var ignored = CloseableLock.lock(lock)) {
+      log.trace("[{}] Acquired lock {} in registerSelfAgain", Thread.currentThread().getName(), System.identityHashCode(lock));
       nodeInfoCatalog.setNodeInfo(getNodeInfo());
       nodeSelector.registrationsLost();
-
-      vertx.executeBlocking(
-          () -> {
-            subscriptionCatalog.republishOwnSubs();
-            return null;
-          },
-          false);
+      subscriptionCatalog.republishOwnSubs();
+    } finally {
+      log.trace("[{}] Released lock {} in registerSelfAgain", Thread.currentThread().getName(), System.identityHashCode(lock));
     }
   }
 
   @Override
   public void leave(Promise<Void> promise) {
+    log.trace("[{}] Attempting to acquire lock {} in leave", Thread.currentThread().getName(), System.identityHashCode(lock));
     vertx
         .<Void>executeBlocking(
             () -> {
               // We need this to be synchronized to prevent other calls from happening while leaving
               // the cluster, typically memberAdded and memberRemoved.
-              if (active.compareAndSet(true, false)) {
-                try (var ignored = CloseableLock.lock(lock)) {
+              try (var ignored = CloseableLock.lock(lock)) {
+                log.trace("[{}] Acquired lock {} in leave", Thread.currentThread().getName(), System.identityHashCode(lock));
+                if (active.compareAndSet(true, false)) {
                   log.debug("Leave custer as {}", nodeId);
 
                   // Stop catalog services.
@@ -272,10 +294,11 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
                   // Disconnect from Redis
                   redissonContext.shutdown();
+                } else {
+                  log.warn("Already deactivated, nodeId: {}", nodeId);
                 }
-              } else {
-                log.warn("Already deactivated, nodeId: {}", nodeId);
               }
+              log.trace("[{}] Released lock {} in leave", Thread.currentThread().getName(), System.identityHashCode(lock));
               return null;
             })
         .onComplete(promise);
