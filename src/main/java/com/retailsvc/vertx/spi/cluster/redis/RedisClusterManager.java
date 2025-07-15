@@ -255,17 +255,17 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   /** Re-register self in the cluster. */
   private void registerSelfAgain() {
-    vertx.executeBlocking(
-        () -> {
-          try (var ignored = CloseableLock.lock(lock)) {
-            nodeInfoCatalog.setNodeInfo(getNodeInfo());
-            nodeSelector.registrationsLost();
-          }
+    try (var ignored = CloseableLock.lock(lock)) {
+      nodeInfoCatalog.setNodeInfo(getNodeInfo());
+      nodeSelector.registrationsLost();
 
-          subscriptionCatalog.republishOwnSubs();
-          return null;
-        },
-        false);
+      vertx.executeBlocking(
+          () -> {
+            subscriptionCatalog.republishOwnSubs();
+            return null;
+          },
+          false);
+    }
   }
 
   @Override
