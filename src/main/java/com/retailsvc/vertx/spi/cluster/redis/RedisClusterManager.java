@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import org.redisson.api.RedissonClient;
@@ -140,18 +141,19 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public NodeInfo getNodeInfo() {
-    if (lock.tryLock()) {
-      try {
-        return nodeInfo;
-      } finally {
+    boolean acquired = false;
+    try {
+      acquired = lock.tryLock(1, TimeUnit.SECONDS);
+      return nodeInfo;
+    } catch (InterruptedException ignored) {
+      return nodeInfo;
+    } finally {
+      if (acquired) {
         lock.unlock();
       }
-    } else {
-      // If we can't acquire the lock immediately, return the current value
-      // This is a trade-off between consistency and non-blocking behavior
-      return nodeInfo;
     }
   }
+
 
   @Override
   public void getNodeInfo(String nodeId, Promise<NodeInfo> promise) {
@@ -209,48 +211,38 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public void memberAdded(String nodeId) {
-    vertx.executeBlocking(
-        () -> {
-          try (var ignored = CloseableLock.lock(lock)) {
-            if (isActive()) {
-              if (log.isDebugEnabled()) {
-                log.debug("Add member [{}]", logId(nodeId));
-              }
-              if (nodeListener != null) {
-                nodeListener.nodeAdded(nodeId);
-              }
-              log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
-            }
-          }
-          return null;
-        },
-        false);
+    try (var ignored = CloseableLock.lock(lock)) {
+      if (isActive()) {
+        if (log.isDebugEnabled()) {
+          log.debug("Add member [{}]", logId(nodeId));
+        }
+        if (nodeListener != null) {
+          nodeListener.nodeAdded(nodeId);
+        }
+        log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
+      }
+    }
   }
 
   @Override
   public void memberRemoved(String nodeId) {
-    vertx.executeBlocking(
-        () -> {
-          try (var ignored = CloseableLock.lock(lock)) {
-            if (isActive()) {
-              if (log.isDebugEnabled()) {
-                log.debug("Remove member [{}]", logId(nodeId));
-              }
-              subscriptionCatalog.removeAllForNodes(singleton(nodeId));
+    try (var ignored = CloseableLock.lock(lock)) {
+      if (isActive()) {
+        if (log.isDebugEnabled()) {
+          log.debug("Remove member [{}]", logId(nodeId));
+        }
+        subscriptionCatalog.removeAllForNodes(singleton(nodeId));
 
-              log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
+        log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
 
-              // Register self again.
-              registerSelfAgain();
+        // Register self again.
+        registerSelfAgain();
 
-              if (nodeListener != null) {
-                nodeListener.nodeLeft(nodeId);
-              }
-            }
-          }
-          return null;
-        },
-        false);
+        if (nodeListener != null) {
+          nodeListener.nodeLeft(nodeId);
+        }
+      }
+    }
   }
 
   /** Re-register self in the cluster. */
@@ -258,13 +250,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     try (var ignored = CloseableLock.lock(lock)) {
       nodeInfoCatalog.setNodeInfo(getNodeInfo());
       nodeSelector.registrationsLost();
-
-      vertx.executeBlocking(
-          () -> {
-            subscriptionCatalog.republishOwnSubs();
-            return null;
-          },
-          false);
+      subscriptionCatalog.republishOwnSubs();
     }
   }
 
