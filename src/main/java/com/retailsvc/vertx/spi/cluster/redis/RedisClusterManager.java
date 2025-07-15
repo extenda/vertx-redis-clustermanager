@@ -141,7 +141,11 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public NodeInfo getNodeInfo() {
-    return nodeInfo.get();
+    if (isActive()) return nodeInfo.get();
+
+    try (var ignored = CloseableLock.lock(lock)) {
+      return nodeInfo.get();
+    }
   }
 
   @Override
