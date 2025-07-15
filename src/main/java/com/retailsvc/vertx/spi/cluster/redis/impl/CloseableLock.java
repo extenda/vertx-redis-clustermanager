@@ -1,6 +1,8 @@
 package com.retailsvc.vertx.spi.cluster.redis.impl;
 
 import java.util.concurrent.locks.Lock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A try-with-resource lock that will be claimed on creation and released with the resource block.
@@ -17,6 +19,7 @@ import java.util.concurrent.locks.Lock;
  */
 public final class CloseableLock implements AutoCloseable {
 
+  private static final Logger log = LoggerFactory.getLogger(CloseableLock.class);
   private final Lock lock;
 
   /**
@@ -39,12 +42,15 @@ public final class CloseableLock implements AutoCloseable {
 
   private CloseableLock(Lock lock) {
     this.lock = lock;
+    log.trace("[{}] Attempting to acquire lock {}", Thread.currentThread().getName(), System.identityHashCode(lock));
     this.lock.lock();
+    log.trace("[{}] Acquired lock {}", Thread.currentThread().getName(), System.identityHashCode(lock));
   }
 
   /** Release the lock. */
   @Override
   public void close() {
     lock.unlock();
+    log.trace("[{}] Released lock {}", Thread.currentThread().getName(), System.identityHashCode(lock));
   }
 }
