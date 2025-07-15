@@ -1,7 +1,5 @@
 package com.retailsvc.vertx.spi.cluster.redis;
 
-import static java.util.Collections.singleton;
-
 import com.retailsvc.vertx.spi.cluster.redis.config.RedisConfig;
 import com.retailsvc.vertx.spi.cluster.redis.impl.CloseableLock;
 import com.retailsvc.vertx.spi.cluster.redis.impl.NodeInfoCatalog;
@@ -21,16 +19,19 @@ import io.vertx.core.spi.cluster.NodeInfo;
 import io.vertx.core.spi.cluster.NodeListener;
 import io.vertx.core.spi.cluster.NodeSelector;
 import io.vertx.core.spi.cluster.RegistrationInfo;
+import org.redisson.api.RedissonClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
-import org.redisson.api.RedissonClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import static java.util.Collections.singleton;
 
 /**
  * A Vert.x cluster manager for Redis.
@@ -45,7 +46,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private VertxInternal vertx;
   private NodeSelector nodeSelector;
   private String nodeId;
-  private NodeInfo nodeInfo;
+  private final AtomicReference<NodeInfo> nodeInfo = new AtomicReference<>();
   private NodeListener nodeListener;
 
   private final AtomicBoolean active = new AtomicBoolean();
@@ -57,8 +58,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private SubscriptionCatalog subscriptionCatalog;
 
   /**
-   * Create a Redis cluster manager with default configuration from system properties or environment
-   * variables.
+   * Create a Redis cluster manager with default configuration from system properties or environment variables.
    */
   public RedisClusterManager() {
     this(new RedisConfig());
@@ -76,7 +76,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   /**
    * Create a Redis cluster manager with specified configuration.
    *
-   * @param config the redis configuration
+   * @param config          the redis configuration
    * @param dataClassLoader class loader used to restore keys and values returned from Redis
    */
   public RedisClusterManager(RedisConfig config, ClassLoader dataClassLoader) {
@@ -130,7 +130,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
         .<Void>executeBlocking(
             () -> {
               try (var ignored = CloseableLock.lock(lock)) {
-                this.nodeInfo = nodeInfo;
+                this.nodeInfo.set(nodeInfo);
               }
               nodeInfoCatalog.setNodeInfo(nodeInfo);
               return null;
@@ -141,19 +141,8 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public NodeInfo getNodeInfo() {
-    boolean acquired = false;
-    try {
-      acquired = lock.tryLock(1, TimeUnit.SECONDS);
-      return nodeInfo;
-    } catch (InterruptedException ignored) {
-      return nodeInfo;
-    } finally {
-      if (acquired) {
-        lock.unlock();
-      }
-    }
+    return nodeInfo.get();
   }
-
 
   @Override
   public void getNodeInfo(String nodeId, Promise<NodeInfo> promise) {
@@ -211,36 +200,36 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public void memberAdded(String nodeId) {
+    if (!isActive())
+      return;
     try (var ignored = CloseableLock.lock(lock)) {
-      if (isActive()) {
-        if (log.isDebugEnabled()) {
-          log.debug("Add member [{}]", logId(nodeId));
-        }
-        if (nodeListener != null) {
-          nodeListener.nodeAdded(nodeId);
-        }
-        log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
+      if (log.isDebugEnabled()) {
+        log.debug("Add member [{}]", logId(nodeId));
       }
+      if (nodeListener != null) {
+        nodeListener.nodeAdded(nodeId);
+      }
+      log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
     }
   }
 
   @Override
   public void memberRemoved(String nodeId) {
+    if (!isActive())
+      return;
     try (var ignored = CloseableLock.lock(lock)) {
-      if (isActive()) {
-        if (log.isDebugEnabled()) {
-          log.debug("Remove member [{}]", logId(nodeId));
-        }
-        subscriptionCatalog.removeAllForNodes(singleton(nodeId));
+      if (log.isDebugEnabled()) {
+        log.debug("Remove member [{}]", logId(nodeId));
+      }
+      subscriptionCatalog.removeAllForNodes(singleton(nodeId));
 
-        log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
+      log.debug("Nodes in catalog:\n{}", nodeInfoCatalog);
 
-        // Register self again.
-        registerSelfAgain();
+      // Register self again.
+      registerSelfAgain();
 
-        if (nodeListener != null) {
-          nodeListener.nodeLeft(nodeId);
-        }
+      if (nodeListener != null) {
+        nodeListener.nodeLeft(nodeId);
       }
     }
   }
@@ -263,7 +252,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
               // the cluster, typically memberAdded and memberRemoved.
               if (active.compareAndSet(true, false)) {
                 try (var ignored = CloseableLock.lock(lock)) {
-                  log.debug("Leave custer as {}", nodeId);
+                  log.debug("Leave cluster as {}", nodeId);
 
                   // Stop catalog services.
                   closeCatalogs();
@@ -325,8 +314,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   /**
-   * Returns a Redis instance object. This method returns an empty optional when the cluster manager
-   * is inactive.
+   * Returns a Redis instance object. This method returns an empty optional when the cluster manager is inactive.
    *
    * @return the redis instance if active.
    */
