@@ -48,7 +48,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private NodeListener nodeListener;
 
   private final AtomicBoolean active = new AtomicBoolean();
-  private final ReentrantLock lock = new ReentrantLock();
+  private final ReentrantLock lock = new ReentrantLock(true);
 
   private RedissonRedisInstance dataGrid;
 
@@ -206,12 +206,8 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   private String logId(String nodeId) {
-    log.trace("[{}] Attempting to acquire lock {} in logId", Thread.currentThread().getName(), System.identityHashCode(lock));
     try (var ignored = CloseableLock.lock(lock)) {
-      log.trace("[{}] Acquired lock {} in logId", Thread.currentThread().getName(), System.identityHashCode(lock));
       return nodeId.equals(this.nodeId) ? "%s (self)".formatted(nodeId) : nodeId;
-    } finally {
-      log.trace("[{}] Released lock {} in logId", Thread.currentThread().getName(), System.identityHashCode(lock));
     }
   }
 
@@ -266,7 +262,12 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
       log.trace("[{}] Acquired lock {} in registerSelfAgain", Thread.currentThread().getName(), System.identityHashCode(lock));
       nodeInfoCatalog.setNodeInfo(getNodeInfo());
       nodeSelector.registrationsLost();
-      subscriptionCatalog.republishOwnSubs();
+      vertx.executeBlocking(
+          () -> {
+            subscriptionCatalog.republishOwnSubs();
+            return null;
+          },
+          false);
     } finally {
       log.trace("[{}] Released lock {} in registerSelfAgain", Thread.currentThread().getName(), System.identityHashCode(lock));
     }
