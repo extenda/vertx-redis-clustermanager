@@ -8,6 +8,7 @@ import io.vertx.core.Vertx;
 import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.core.shareddata.Counter;
 import io.vertx.core.shareddata.Lock;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.BlockingQueue;
@@ -112,6 +113,18 @@ public interface RedisDataGrid {
    * @return a blocking deque instance.
    */
   <V> BlockingDeque<V> getBlockingDeque(String name);
+
+  /**
+   * Returns list backed by Redis.
+   *
+   * @param <V> type of value
+   * @param name name of the lsit
+   * @return a list instance.
+   * @since 1.2.0
+   */
+  default <V> List<V> getList(String name) {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Returns a topic backed by Redis.
