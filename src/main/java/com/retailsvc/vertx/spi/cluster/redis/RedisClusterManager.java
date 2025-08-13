@@ -48,7 +48,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private NodeListener nodeListener;
 
   private final AtomicBoolean active = new AtomicBoolean();
-  private final ReentrantLock lock = new ReentrantLock();
+  private final ReentrantLock lock = new ReentrantLock(true);
 
   private RedissonRedisInstance dataGrid;
 
