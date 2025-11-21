@@ -1,15 +1,10 @@
 package com.retailsvc.vertx.spi.cluster.redis.impl;
 
+import static java.util.Collections.emptySet;
+
 import io.vertx.core.spi.cluster.NodeSelector;
 import io.vertx.core.spi.cluster.RegistrationInfo;
 import io.vertx.core.spi.cluster.RegistrationUpdateEvent;
-import org.redisson.api.RSet;
-import org.redisson.api.RSetMultimap;
-import org.redisson.api.RTopic;
-import org.redisson.api.RedissonClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -24,8 +19,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import static java.util.Collections.emptySet;
+import org.redisson.api.RSet;
+import org.redisson.api.RSetMultimap;
+import org.redisson.api.RTopic;
+import org.redisson.api.RedissonClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Manage Vertx Event Bus subscriptions in Redis.
