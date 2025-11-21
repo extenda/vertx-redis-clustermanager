@@ -56,11 +56,12 @@ public class SubscriptionCatalog {
   /**
    * Create a new subscription catalog.
    *
-   * @param redisson     the redisson client
-   * @param keyFactory   the key factory
+   * @param redisson the redisson client
+   * @param keyFactory the key factory
    * @param nodeSelector Vertx node selector
    */
-  public SubscriptionCatalog(RedissonClient redisson, RedisKeyFactory keyFactory, NodeSelector nodeSelector) {
+  public SubscriptionCatalog(
+      RedissonClient redisson, RedisKeyFactory keyFactory, NodeSelector nodeSelector) {
     this.nodeSelector = nodeSelector;
     subsMap = redisson.getSetMultimap(keyFactory.vertx("subs"));
     topic = redisson.getTopic(keyFactory.topic("subs"));
@@ -71,12 +72,15 @@ public class SubscriptionCatalog {
   /**
    * Create a new subscription catalog.
    *
-   * @param predecessor     the previous subscription catalog
-   * @param redisson        the redisson client
+   * @param predecessor the previous subscription catalog
+   * @param redisson the redisson client
    * @param redisKeyFactory the key factory
-   * @param nodeSelector    Vertx node selector
+   * @param nodeSelector Vertx node selector
    */
-  public SubscriptionCatalog(SubscriptionCatalog predecessor, RedissonClient redisson, RedisKeyFactory redisKeyFactory,
+  public SubscriptionCatalog(
+      SubscriptionCatalog predecessor,
+      RedissonClient redisson,
+      RedisKeyFactory redisKeyFactory,
       NodeSelector nodeSelector) {
     this(redisson, redisKeyFactory, nodeSelector);
     ownSubs.putAll(predecessor.ownSubs);
@@ -117,7 +121,7 @@ public class SubscriptionCatalog {
   /**
    * Store registration information for the cluster manager.
    *
-   * @param address          the address to register
+   * @param address the address to register
    * @param registrationInfo the registration information
    */
   public void put(String address, RegistrationInfo registrationInfo) {
@@ -138,8 +142,8 @@ public class SubscriptionCatalog {
   }
 
   /**
-   * Get the updated registration information and notify the node selector. This method is throttled to not fire too
-   * often.
+   * Get the updated registration information and notify the node selector. This method is throttled
+   * to not fire too often.
    *
    * @param address the modified address
    * @see Throttling
@@ -166,7 +170,8 @@ public class SubscriptionCatalog {
     throttling.onEvent(address);
   }
 
-  private Set<RegistrationInfo> addToSet(RegistrationInfo registrationInfo, Set<RegistrationInfo> value) {
+  private Set<RegistrationInfo> addToSet(
+      RegistrationInfo registrationInfo, Set<RegistrationInfo> value) {
     Set<RegistrationInfo> newValue = value != null ? value : ConcurrentHashMap.newKeySet();
     newValue.add(registrationInfo);
     return newValue;
@@ -175,7 +180,7 @@ public class SubscriptionCatalog {
   /**
    * Remove a registration from the cluster manager.
    *
-   * @param address          the address to unregister from
+   * @param address the address to unregister from
    * @param registrationInfo the registration information to remove
    */
   public void remove(String address, RegistrationInfo registrationInfo) {
@@ -195,7 +200,8 @@ public class SubscriptionCatalog {
     }
   }
 
-  private Set<RegistrationInfo> removeFromSet(RegistrationInfo registrationInfo, Set<RegistrationInfo> value) {
+  private Set<RegistrationInfo> removeFromSet(
+      RegistrationInfo registrationInfo, Set<RegistrationInfo> value) {
     value.remove(registrationInfo);
     return value.isEmpty() ? null : value;
   }
@@ -207,24 +213,27 @@ public class SubscriptionCatalog {
    */
   public void removeAllForNodes(Set<String> nodeIds) {
     Set<String> updated = new HashSet<>();
-    subsMap.entries().forEach(entry -> {
-      if (nodeIds.contains(entry.getValue().nodeId())) {
-        subsMap.remove(entry.getKey(), entry.getValue());
-        updated.add(entry.getKey());
-      }
-    });
+    subsMap
+        .entries()
+        .forEach(
+            entry -> {
+              if (nodeIds.contains(entry.getValue().nodeId())) {
+                subsMap.remove(entry.getKey(), entry.getValue());
+                updated.add(entry.getKey());
+              }
+            });
     updated.forEach(topic::publish);
   }
 
   /**
-   * Remove subscriptions for nodes that are not part of the <code>availableNodeIds</code> collection. Own subscriptions
-   * are never removed.
+   * Remove subscriptions for nodes that are not part of the <code>availableNodeIds</code>
+   * collection. Own subscriptions are never removed.
    *
    * <p>Unknown nodes with lingering state can observed in clusters that has scaled down to one and
-   * then crashes. If a new node is not available to receive events when node entries expire in Redis, the subscriptions
-   * will remain registered in Redis.
+   * then crashes. If a new node is not available to receive events when node entries expire in
+   * Redis, the subscriptions will remain registered in Redis.
    *
-   * @param self             the node ID of this process
+   * @param self the node ID of this process
    * @param availableNodeIds a set of available nodes
    */
   public void removeUnknownSubs(String self, Collection<String> availableNodeIds) {
@@ -293,8 +302,11 @@ public class SubscriptionCatalog {
     }
 
     // Logging summary
-    log.warn("Removed {} lingering subscriptions from {} unknown node(s). Breakdown: {}", totalRemoved.get(),
-        removedPerNode.size(), removedPerNode);
+    log.warn(
+        "Removed {} lingering subscriptions from {} unknown node(s). Breakdown: {}",
+        totalRemoved.get(),
+        removedPerNode.size(),
+        removedPerNode);
 
     if (totalFailed.get() > 0) {
       log.warn("Failed to remove {} subscriptions", totalFailed.get());
@@ -310,10 +322,13 @@ public class SubscriptionCatalog {
     writeLock.lock();
     try {
       Set<String> updated = new HashSet<>();
-      ownSubs.forEach((address, registrationInfos) -> registrationInfos.forEach(registrationInfo -> {
-        subsMap.put(address, registrationInfo);
-        updated.add(address);
-      }));
+      ownSubs.forEach(
+          (address, registrationInfos) ->
+              registrationInfos.forEach(
+                  registrationInfo -> {
+                    subsMap.put(address, registrationInfo);
+                    updated.add(address);
+                  }));
       updated.forEach(topic::publish);
     } finally {
       writeLock.unlock();
