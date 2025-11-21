@@ -271,7 +271,7 @@ public class SubscriptionCatalog {
       RSet<RegistrationInfo> set = subsMap.get(key);
 
       try {
-        // Bulk remove
+        // Bulk remove all
         set.removeAll(staleValues);
 
         // Mark as updated because stale entries existed
