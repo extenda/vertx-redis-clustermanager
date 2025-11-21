@@ -8,14 +8,19 @@ import io.vertx.core.spi.cluster.RegistrationUpdateEvent;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import org.redisson.api.RSet;
 import org.redisson.api.RSetMultimap;
 import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;
@@ -40,7 +45,7 @@ public class SubscriptionCatalog {
 
   private final ConcurrentMap<String, Set<RegistrationInfo>> localSubs = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, Set<RegistrationInfo>> ownSubs = new ConcurrentHashMap<>();
-  private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+  private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock(true);
   private final Throttling throttling;
 
   /**
@@ -227,24 +232,87 @@ public class SubscriptionCatalog {
    * @param availableNodeIds a set of available nodes
    */
   public void removeUnknownSubs(String self, Collection<String> availableNodeIds) {
-    Set<String> known = new HashSet<>(availableNodeIds);
-    known.add(self);
 
-    Set<String> updated = new HashSet<>();
-    subsMap
-        .entries()
-        .forEach(
-            entry -> {
-              if (!known.contains(entry.getValue().nodeId())) {
-                log.warn(
-                    "Remove lingering subscriptions from unknown node [{}]",
-                    entry.getValue().nodeId());
-                subsMap.remove(entry.getKey(), entry.getValue());
-                updated.add(entry.getKey());
-              }
-            });
-    updated.forEach(topic::publish);
+    // Build set of known nodes (cluster members + self)
+    Set<String> knownNodes = new HashSet<>(availableNodeIds);
+    knownNodes.add(self);
+
+    // Stats
+    AtomicInteger totalRemoved = new AtomicInteger();
+    AtomicInteger totalFailed = new AtomicInteger();
+    Map<String, Integer> removedPerNode = new HashMap<>();
+
+    // Group stale subs by subscription key (address)
+    Map<String, List<RegistrationInfo>> cleanupByKey = new HashMap<>();
+
+    for (Map.Entry<String, RegistrationInfo> entry : subsMap.entries()) {
+      RegistrationInfo info = entry.getValue();
+      if (!knownNodes.contains(info.nodeId())) {
+        cleanupByKey
+            .computeIfAbsent(entry.getKey(), k -> new ArrayList<>())
+            .add(info);
+      }
+    }
+
+    if (cleanupByKey.isEmpty()) {
+      return;
+    }
+
+    List<String> updatedKeys = new ArrayList<>();
+
+    // Bulk remove values per key
+    for (Map.Entry<String, List<RegistrationInfo>> entry : cleanupByKey.entrySet()) {
+      String key = entry.getKey();
+      List<RegistrationInfo> staleValues = entry.getValue();
+
+      RSet<RegistrationInfo> set = subsMap.get(key);
+
+      try {
+        // Bulk remove
+        set.removeAll(staleValues);
+
+        // Mark as updated because stale entries existed
+        updatedKeys.add(key);
+
+        // Stats
+        for (RegistrationInfo info : staleValues) {
+          removedPerNode.merge(info.nodeId(), 1, Integer::sum);
+          totalRemoved.incrementAndGet();
+        }
+
+      } catch (Exception e) {
+        // Fallback to safe per-value removal
+        log.warn("Bulk removal failed for key [{}], retrying individually", key, e);
+
+        for (RegistrationInfo info : staleValues) {
+          boolean ok = subsMap.remove(key, info);
+          if (ok) {
+            removedPerNode.merge(info.nodeId(), 1, Integer::sum);
+            totalRemoved.incrementAndGet();
+          } else {
+            totalFailed.incrementAndGet();
+          }
+        }
+
+        updatedKeys.add(key);
+      }
+    }
+
+    // Logging summary
+    log.warn(
+        "Removed {} lingering subscriptions from {} unknown node(s). Breakdown: {}",
+        totalRemoved.get(),
+        removedPerNode.size(),
+        removedPerNode);
+
+    if (totalFailed.get() > 0) {
+      log.warn("Failed to remove {} subscriptions", totalFailed.get());
+    }
+
+    // Notify all updated keys
+    updatedKeys.forEach(topic::publish);
   }
+
 
   /** Republish subscriptions that belongs to the current node (in which this is executed). */
   public void republishOwnSubs() {
