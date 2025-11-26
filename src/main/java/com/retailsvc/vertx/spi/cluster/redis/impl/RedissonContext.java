@@ -35,7 +35,7 @@ public final class RedissonContext {
 
   private RedissonClient client;
   private ExecutorService lockReleaseExec;
-  private final Lock lock = new ReentrantLock();
+  private final Lock lock = new ReentrantLock(true);
 
   /**
    * Create a new Redisson context with specified configuration.

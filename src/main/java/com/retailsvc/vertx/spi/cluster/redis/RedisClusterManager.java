@@ -125,12 +125,12 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public void setNodeInfo(NodeInfo nodeInfo, Promise<Void> promise) {
-    try (var ignored = CloseableLock.lock(lock)) {
-      this.nodeInfo = nodeInfo;
-    }
     vertx
         .<Void>executeBlocking(
             () -> {
+              try (var ignored = CloseableLock.lock(lock)) {
+                this.nodeInfo = nodeInfo;
+              }
               nodeInfoCatalog.setNodeInfo(nodeInfo);
               return null;
             },
