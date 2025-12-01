@@ -1,5 +1,8 @@
-name: commit
-on: push
+name: Release
+
+on:
+  push:
+    branches: [ master ]
 
 env:
   MAVEN_INIT: 'false'
