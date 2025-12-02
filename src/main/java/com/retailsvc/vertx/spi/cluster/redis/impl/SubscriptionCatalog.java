@@ -38,19 +38,12 @@ public class SubscriptionCatalog {
   private static final Logger log = LoggerFactory.getLogger(SubscriptionCatalog.class);
 
   private final RSetMultimap<String, RegistrationInfo> subsMap;
-
   private final NodeSelector nodeSelector;
-
   private final int listenerId;
-
   private final RTopic topic;
-
   private final ConcurrentMap<String, Set<RegistrationInfo>> localSubs = new ConcurrentHashMap<>();
-
   private final ConcurrentMap<String, Set<RegistrationInfo>> ownSubs = new ConcurrentHashMap<>();
-
   private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock(true);
-
   private final Throttling throttling;
 
   /**
@@ -229,8 +222,8 @@ public class SubscriptionCatalog {
    * Remove subscriptions for nodes that are not part of the <code>availableNodeIds</code>
    * collection. Own subscriptions are never removed.
    *
-   * <p>Unknown nodes with lingering state can observed in clusters that has scaled down to one and
-   * then crashes. If a new node is not available to receive events when node entries expire in
+   * <p>Unknown nodes with lingering state can be observed in clusters that has scaled down to one
+   * and then crashes. If a new node is not available to receive events when node entries expire in
    * Redis, the subscriptions will remain registered in Redis.
    *
    * @param self the node ID of this process
@@ -241,11 +234,6 @@ public class SubscriptionCatalog {
     // Build set of known nodes (cluster members + self)
     Set<String> knownNodes = new HashSet<>(availableNodeIds);
     knownNodes.add(self);
-
-    // Stats
-    AtomicInteger totalRemoved = new AtomicInteger();
-    AtomicInteger totalFailed = new AtomicInteger();
-    Map<String, Integer> removedPerNode = new HashMap<>();
 
     // Group stale subs by subscription key (address)
     Map<String, List<RegistrationInfo>> cleanupByKey = new HashMap<>();
@@ -261,17 +249,37 @@ public class SubscriptionCatalog {
       return;
     }
 
-    List<String> updatedKeys = new ArrayList<>();
+    // Bulk remove all unknown subscriptions
+    List<String> updatedKeys = bulkRemoveUnknownSubsByKey(cleanupByKey, subsMap);
 
-    // Bulk remove values per key
+    // Notify all updated keys across the cluster nodes
+    updatedKeys.forEach(topic::publish);
+  }
+
+  /**
+   * Bulk remove unknown subscriptions grouped by key (address) to reduce round trips to Redis. If a
+   * bulk deletion fails, this method falls back to individual deletion per entry.
+   *
+   * @param cleanupByKey the stale subscriptions to remove, grouped by key (address)
+   * @param subscriptions the subscriptions map in Redis
+   * @return the updated keys (addresses)
+   */
+  static List<String> bulkRemoveUnknownSubsByKey(
+      Map<String, List<RegistrationInfo>> cleanupByKey,
+      RSetMultimap<String, RegistrationInfo> subscriptions) {
+    // Stats
+    AtomicInteger totalRemoved = new AtomicInteger();
+    AtomicInteger totalFailed = new AtomicInteger();
+    Map<String, Integer> removedPerNode = new HashMap<>();
+
+    List<String> updatedKeys = new ArrayList<>();
     for (Map.Entry<String, List<RegistrationInfo>> entry : cleanupByKey.entrySet()) {
       String key = entry.getKey();
       List<RegistrationInfo> staleValues = entry.getValue();
-
-      RSet<RegistrationInfo> set = subsMap.get(key);
-
       try {
-        // Bulk remove all
+        RSet<RegistrationInfo> set = subscriptions.get(key);
+
+        // Bulk remove all (single round trip to Redis)
         set.removeAll(staleValues);
 
         // Mark as updated because stale entries existed
@@ -282,13 +290,12 @@ public class SubscriptionCatalog {
           removedPerNode.merge(info.nodeId(), 1, Integer::sum);
           totalRemoved.incrementAndGet();
         }
-
       } catch (Exception e) {
         // Fallback to safe per-value removal
         log.warn("Bulk removal failed for key [{}], retrying individually", key, e);
 
         for (RegistrationInfo info : staleValues) {
-          boolean ok = subsMap.remove(key, info);
+          boolean ok = subscriptions.remove(key, info);
           if (ok) {
             removedPerNode.merge(info.nodeId(), 1, Integer::sum);
             totalRemoved.incrementAndGet();
@@ -311,9 +318,7 @@ public class SubscriptionCatalog {
     if (totalFailed.get() > 0) {
       log.warn("Failed to remove {} subscriptions", totalFailed.get());
     }
-
-    // Notify all updated keys
-    updatedKeys.forEach(topic::publish);
+    return updatedKeys;
   }
 
   /** Republish subscriptions that belongs to the current node (in which this is executed). */
