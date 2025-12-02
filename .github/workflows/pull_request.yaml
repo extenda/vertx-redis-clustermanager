@@ -22,7 +22,7 @@ jobs:
         run: ./mvnw verify
 
       - name: Scan with SonarCloud
-        if: ${{ env.SECRET_AUTH != '' }}
+        if: ${{ secrets.SECRET_AUTH != '' }}
         uses: extenda/actions/sonar-scanner@v0
         with:
           sonar-host: https://sonarcloud.io
