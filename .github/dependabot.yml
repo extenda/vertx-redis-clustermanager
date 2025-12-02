@@ -8,6 +8,13 @@ updates:
       maven:
         patterns:
           - '*'
+    ignore:
+      - dependency-name: "org.junit:junit-bom"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "org.testcontainers:testcontainers-bom"
+        update-types:
+          - "version-update:semver-major"
   - package-ecosystem: github-actions
     directory: '/'
     schedule:
