@@ -22,7 +22,7 @@ jobs:
           cache: maven
 
       - name: Run tests
-        run: ./mvnw verify
+        run: ./mvnw -V -B verify
 
       - name: Scan with SonarCloud
         if: github.repository == 'extenda/vertx-redis-clustermanager'
