@@ -35,7 +35,7 @@ public final class RedissonContext {
 
   private RedissonClient client;
   private ExecutorService lockReleaseExec;
-  private final Lock lock = new ReentrantLock();
+  private final Lock lock = new ReentrantLock(true);
 
   /**
    * Create a new Redisson context with specified configuration.
@@ -58,9 +58,8 @@ public final class RedissonContext {
 
     BaseConfig<?> serverConfig =
         switch (config.getClientType()) {
-          case STANDALONE -> redisConfig
-              .useSingleServer()
-              .setAddress(config.getEndpoints().getFirst());
+          case STANDALONE ->
+              redisConfig.useSingleServer().setAddress(config.getEndpoints().getFirst());
           case CLUSTER -> {
             ClusterServersConfig clusterConfig = redisConfig.useClusterServers();
             clusterConfig.setNodeAddresses(config.getEndpoints());

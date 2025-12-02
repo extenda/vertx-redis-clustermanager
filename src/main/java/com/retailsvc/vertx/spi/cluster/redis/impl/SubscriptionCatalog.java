@@ -8,14 +8,18 @@ import io.vertx.core.spi.cluster.RegistrationUpdateEvent;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.redisson.api.RSet;
 import org.redisson.api.RSetMultimap;
 import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;
@@ -37,10 +41,9 @@ public class SubscriptionCatalog {
   private final NodeSelector nodeSelector;
   private final int listenerId;
   private final RTopic topic;
-
   private final ConcurrentMap<String, Set<RegistrationInfo>> localSubs = new ConcurrentHashMap<>();
   private final ConcurrentMap<String, Set<RegistrationInfo>> ownSubs = new ConcurrentHashMap<>();
-  private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+  private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock(true);
   private final Throttling throttling;
 
   /**
@@ -219,31 +222,103 @@ public class SubscriptionCatalog {
    * Remove subscriptions for nodes that are not part of the <code>availableNodeIds</code>
    * collection. Own subscriptions are never removed.
    *
-   * <p>Unknown nodes with lingering state can observed in clusters that has scaled down to one and
-   * then crashes. If a new node is not available to receive events when node entries expire in
+   * <p>Unknown nodes with lingering state can be observed in clusters that has scaled down to one
+   * and then crashes. If a new node is not available to receive events when node entries expire in
    * Redis, the subscriptions will remain registered in Redis.
    *
    * @param self the node ID of this process
    * @param availableNodeIds a set of available nodes
    */
   public void removeUnknownSubs(String self, Collection<String> availableNodeIds) {
-    Set<String> known = new HashSet<>(availableNodeIds);
-    known.add(self);
 
-    Set<String> updated = new HashSet<>();
-    subsMap
-        .entries()
-        .forEach(
-            entry -> {
-              if (!known.contains(entry.getValue().nodeId())) {
-                log.warn(
-                    "Remove lingering subscriptions from unknown node [{}]",
-                    entry.getValue().nodeId());
-                subsMap.remove(entry.getKey(), entry.getValue());
-                updated.add(entry.getKey());
-              }
-            });
-    updated.forEach(topic::publish);
+    // Build set of known nodes (cluster members + self)
+    Set<String> knownNodes = new HashSet<>(availableNodeIds);
+    knownNodes.add(self);
+
+    // Group stale subs by subscription key (address)
+    Map<String, List<RegistrationInfo>> cleanupByKey = new HashMap<>();
+
+    for (Map.Entry<String, RegistrationInfo> entry : subsMap.entries()) {
+      RegistrationInfo info = entry.getValue();
+      if (!knownNodes.contains(info.nodeId())) {
+        cleanupByKey.computeIfAbsent(entry.getKey(), k -> new ArrayList<>()).add(info);
+      }
+    }
+
+    if (cleanupByKey.isEmpty()) {
+      return;
+    }
+
+    // Bulk remove all unknown subscriptions
+    List<String> updatedKeys = bulkRemoveUnknownSubsByKey(cleanupByKey, subsMap);
+
+    // Notify all updated keys across the cluster nodes
+    updatedKeys.forEach(topic::publish);
+  }
+
+  /**
+   * Bulk remove unknown subscriptions grouped by key (address) to reduce round trips to Redis. If a
+   * bulk deletion fails, this method falls back to individual deletion per entry.
+   *
+   * @param cleanupByKey the stale subscriptions to remove, grouped by key (address)
+   * @param subscriptions the subscriptions map in Redis
+   * @return the updated keys (addresses)
+   */
+  static List<String> bulkRemoveUnknownSubsByKey(
+      Map<String, List<RegistrationInfo>> cleanupByKey,
+      RSetMultimap<String, RegistrationInfo> subscriptions) {
+    // Stats
+    AtomicInteger totalRemoved = new AtomicInteger();
+    AtomicInteger totalFailed = new AtomicInteger();
+    Map<String, Integer> removedPerNode = new HashMap<>();
+
+    List<String> updatedKeys = new ArrayList<>();
+    for (Map.Entry<String, List<RegistrationInfo>> entry : cleanupByKey.entrySet()) {
+      String key = entry.getKey();
+      List<RegistrationInfo> staleValues = entry.getValue();
+      try {
+        RSet<RegistrationInfo> set = subscriptions.get(key);
+
+        // Bulk remove all (single round trip to Redis)
+        set.removeAll(staleValues);
+
+        // Mark as updated because stale entries existed
+        updatedKeys.add(key);
+
+        // Stats
+        for (RegistrationInfo info : staleValues) {
+          removedPerNode.merge(info.nodeId(), 1, Integer::sum);
+          totalRemoved.incrementAndGet();
+        }
+      } catch (Exception e) {
+        // Fallback to safe per-value removal
+        log.warn("Bulk removal failed for key [{}], retrying individually", key, e);
+
+        for (RegistrationInfo info : staleValues) {
+          boolean ok = subscriptions.remove(key, info);
+          if (ok) {
+            removedPerNode.merge(info.nodeId(), 1, Integer::sum);
+            totalRemoved.incrementAndGet();
+          } else {
+            totalFailed.incrementAndGet();
+          }
+        }
+
+        updatedKeys.add(key);
+      }
+    }
+
+    // Logging summary
+    log.warn(
+        "Removed {} lingering subscriptions from {} unknown node(s). Breakdown: {}",
+        totalRemoved.get(),
+        removedPerNode.size(),
+        removedPerNode);
+
+    if (totalFailed.get() > 0) {
+      log.warn("Failed to remove {} subscriptions", totalFailed.get());
+    }
+    return updatedKeys;
   }
 
   /** Republish subscriptions that belongs to the current node (in which this is executed). */

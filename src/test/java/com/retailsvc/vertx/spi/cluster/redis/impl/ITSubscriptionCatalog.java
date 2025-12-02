@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,9 +16,13 @@ import com.retailsvc.vertx.spi.cluster.redis.RedisTestContainerFactory;
 import io.vertx.core.spi.cluster.NodeSelector;
 import io.vertx.core.spi.cluster.RegistrationInfo;
 import io.vertx.core.spi.cluster.RegistrationUpdateEvent;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.redisson.Redisson;
+import org.redisson.api.RSet;
+import org.redisson.api.RSetMultimap;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
 import org.testcontainers.containers.GenericContainer;
@@ -32,6 +37,7 @@ class ITSubscriptionCatalog {
   private final RedisKeyFactory keyFactory = new RedisKeyFactory("test");
   private NodeSelector nodeSelector;
   private SubscriptionCatalog subsCatalog;
+  private RedissonClient redisson;
 
   @BeforeEach
   void beforeEach() {
@@ -40,7 +46,7 @@ class ITSubscriptionCatalog {
     String redisUrl = "redis://" + redis.getHost() + ":" + redis.getFirstMappedPort();
     Config config = new Config();
     config.useSingleServer().setAddress(redisUrl);
-    RedissonClient redisson = Redisson.create(config);
+    redisson = Redisson.create(config);
     subsCatalog = new SubscriptionCatalog(redisson, keyFactory, nodeSelector);
     when(nodeSelector.wantsUpdatesFor(anyString())).thenReturn(true);
   }
@@ -108,6 +114,35 @@ class ITSubscriptionCatalog {
     subsCatalog.removeUnknownSubs("node3", asList("node1", "node2"));
     assertThat(subsCatalog.get("sub-1")).hasSize(2);
     assertThat(subsCatalog.get("sub-2")).hasSize(1);
+  }
+
+  @Test
+  void removeUnknownSubsBulkException() {
+    putSubs();
+    subsCatalog.put("sub-1", new RegistrationInfo("node3", 4, false));
+    subsCatalog.put("sub-1", new RegistrationInfo("node4", 5, false));
+
+    List<RegistrationInfo> subs1 = List.of(new RegistrationInfo("node1", 1, false));
+    List<RegistrationInfo> subs2 = List.of(new RegistrationInfo("node1", 2, false));
+
+    // Spy and mock the subs map to throw exception
+    RSetMultimap<String, RegistrationInfo> subsMap =
+        spy(redisson.getSetMultimap(keyFactory.vertx("subs")));
+    @SuppressWarnings("unchecked")
+    RSet<RegistrationInfo> setMock = mock(RSet.class);
+    when(subsMap.get("sub-1")).thenReturn(setMock);
+    when(setMock.removeAll(subs1)).thenThrow(new RuntimeException("TEST"));
+
+    SubscriptionCatalog.bulkRemoveUnknownSubsByKey(Map.of("sub-1", subs1, "sub-2", subs2), subsMap);
+
+    assertThat(subsCatalog.get("sub-1"))
+        .containsOnly(
+            new RegistrationInfo("node2", 3, false),
+            new RegistrationInfo("node3", 4, false),
+            new RegistrationInfo("node4", 5, false));
+    assertThat(subsCatalog.get("sub-2")).isEmpty();
+    verify(nodeSelector, timeout(100).atLeast(1))
+        .registrationsUpdated(any(RegistrationUpdateEvent.class));
   }
 
   @Test

@@ -4,6 +4,9 @@ on:
     branches: [ master ]
     types: [ opened, synchronize, reopened ]
 
+env:
+  MAVEN_INIT: 'false'
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -22,7 +25,7 @@ jobs:
         run: ./mvnw verify
 
       - name: Scan with SonarCloud
-        if: ${{ env.SECRET_AUTH != '' }}
+        if: github.repository == 'extenda/vertx-redis-clustermanager'
         uses: extenda/actions/sonar-scanner@v0
         with:
           sonar-host: https://sonarcloud.io
