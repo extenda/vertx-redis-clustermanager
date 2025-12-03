@@ -66,7 +66,8 @@ public final class RedissonRedisInstance implements RedisInstance {
   public boolean ping() {
     return switch (config.getClientType()) {
       case STANDALONE -> redisson.getRedisNodes(RedisNodes.SINGLE).pingAll();
-      case CLUSTER, REPLICATED -> redisson.getRedisNodes(RedisNodes.CLUSTER).pingAll();
+      case CLUSTER -> redisson.getRedisNodes(RedisNodes.CLUSTER).pingAll();
+      case REPLICATED -> redisson.getRedisNodes(RedisNodes.MASTER_SLAVE).pingAll();
     };
   }
 
