@@ -74,7 +74,7 @@
       <dependency>
         <groupId>org.testcontainers</groupId>
         <artifactId>testcontainers-bom</artifactId>
-        <version>1.21.3</version>
+        <version>1.21.4</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -107,7 +107,7 @@
       <dependency>
         <groupId>org.redisson</groupId>
         <artifactId>redisson</artifactId>
-        <version>3.52.0</version>
+        <version>4.0.0</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
@@ -140,7 +140,7 @@
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
-      <version>1.5.22</version>
+      <version>1.5.23</version>
       <scope>test</scope>
     </dependency>
     <dependency>
