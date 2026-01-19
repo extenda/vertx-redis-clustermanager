@@ -60,7 +60,7 @@
       <dependency>
         <groupId>io.vertx</groupId>
         <artifactId>vertx-stack-depchain</artifactId>
-        <version>4.5.23</version>
+        <version>4.5.24</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -140,7 +140,7 @@
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
-      <version>1.5.24</version>
+      <version>1.5.25</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -397,7 +397,7 @@
       <plugin>
         <groupId>org.sonatype.central</groupId>
         <artifactId>central-publishing-maven-plugin</artifactId>
-        <version>0.9.0</version>
+        <version>0.10.0</version>
         <extensions>true</extensions>
         <configuration>
           <publishingServerId>central</publishingServerId>
