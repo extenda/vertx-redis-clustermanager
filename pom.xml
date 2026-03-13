@@ -60,7 +60,7 @@
       <dependency>
         <groupId>io.vertx</groupId>
         <artifactId>vertx-stack-depchain</artifactId>
-        <version>4.5.24</version>
+        <version>4.5.25</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -84,9 +84,9 @@
         <version>1.7.0</version>
       </dependency>
       <dependency>
-        <groupId>junit</groupId>
-        <artifactId>junit</artifactId>
-        <version>4.13.2</version>
+        <groupId>org.assertj</groupId>
+        <artifactId>assertj-core</artifactId>
+        <version>3.24.2</version>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
@@ -102,12 +102,12 @@
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-junit-jupiter</artifactId>
-        <version>5.21.0</version>
+        <version>5.22.0</version>
       </dependency>
       <dependency>
         <groupId>org.redisson</groupId>
         <artifactId>redisson</artifactId>
-        <version>4.2.0</version>
+        <version>4.3.0</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
@@ -140,7 +140,7 @@
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
-      <version>1.5.29</version>
+      <version>1.5.32</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -189,7 +189,6 @@
     <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
-      <version>3.3.0</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -322,7 +321,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.5.4</version>
+        <version>3.5.5</version>
         <configuration>
           <argLine>@{jacoco.argLine} -Dfile.encoding=utf-8</argLine>
           <failIfNoTests>false</failIfNoTests>
@@ -331,7 +330,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-failsafe-plugin</artifactId>
-        <version>3.5.4</version>
+        <version>3.5.5</version>
         <configuration>
           <argLine>@{jacoco.argLine} -Dfile.encoding=utf-8</argLine>
           <!--
