@@ -4,8 +4,8 @@ import static java.util.Arrays.asList;
 
 import com.retailsvc.vertx.spi.cluster.redis.RedisClusterManagerTestFactory;
 import com.retailsvc.vertx.spi.cluster.redis.RedisTestContainerFactory;
-import io.vertx.core.eventbus.FaultToleranceTest;
 import io.vertx.core.spi.cluster.ClusterManager;
+import io.vertx.tests.eventbus.FaultToleranceTest;
 import java.util.List;
 import org.junit.Rule;
 import org.testcontainers.containers.GenericContainer;

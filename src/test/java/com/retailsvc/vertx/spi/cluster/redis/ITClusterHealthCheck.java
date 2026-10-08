@@ -25,7 +25,10 @@ class ITClusterHealthCheck {
   @BeforeEach
   void beforeEach() {
     RedisClusterManager clusterManager = RedisClusterManagerTestFactory.newInstance(redis);
-    Vertx.builder().withClusterManager(clusterManager).buildClustered(ar -> vertx = ar.result());
+    Vertx.builder()
+        .withClusterManager(clusterManager)
+        .buildClustered()
+        .onComplete(ar -> vertx = ar.result());
     await().until(() -> vertx != null);
   }
 

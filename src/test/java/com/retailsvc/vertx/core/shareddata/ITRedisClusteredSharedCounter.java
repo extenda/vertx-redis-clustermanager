@@ -2,8 +2,8 @@ package com.retailsvc.vertx.core.shareddata;
 
 import com.retailsvc.vertx.spi.cluster.redis.RedisClusterManagerTestFactory;
 import com.retailsvc.vertx.spi.cluster.redis.RedisTestContainerFactory;
-import io.vertx.core.shareddata.ClusteredSharedCounterTest;
 import io.vertx.core.spi.cluster.ClusterManager;
+import io.vertx.tests.shareddata.ClusteredSharedCounterTest;
 import org.junit.Rule;
 import org.testcontainers.containers.GenericContainer;
 

@@ -2,7 +2,7 @@ package com.retailsvc.vertx.spi.cluster.redis.impl;
 
 import static java.util.Collections.emptySet;
 
-import io.vertx.core.spi.cluster.NodeSelector;
+import io.vertx.core.eventbus.impl.clustered.NodeSelector;
 import io.vertx.core.spi.cluster.RegistrationInfo;
 import io.vertx.core.spi.cluster.RegistrationUpdateEvent;
 import java.util.ArrayList;

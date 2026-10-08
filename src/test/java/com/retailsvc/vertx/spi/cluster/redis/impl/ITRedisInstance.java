@@ -57,7 +57,10 @@ class ITRedisInstance {
             .addMap(new MapConfig("maxSize").setMaxSize(3))
             .addLock(new LockConfig("leaseTime").setLeaseTime(1000));
     clusterManager = new RedisClusterManager(config);
-    Vertx.builder().withClusterManager(clusterManager).buildClustered(ar -> vertx = ar.result());
+    Vertx.builder()
+        .withClusterManager(clusterManager)
+        .buildClustered()
+        .onComplete(ar -> vertx = ar.result());
     await().until(() -> vertx != null);
   }
 

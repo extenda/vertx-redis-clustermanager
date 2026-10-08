@@ -9,18 +9,19 @@ import com.retailsvc.vertx.spi.cluster.redis.impl.NodeInfoCatalogListener;
 import com.retailsvc.vertx.spi.cluster.redis.impl.RedissonContext;
 import com.retailsvc.vertx.spi.cluster.redis.impl.RedissonRedisInstance;
 import com.retailsvc.vertx.spi.cluster.redis.impl.SubscriptionCatalog;
-import io.vertx.core.Promise;
+import io.vertx.core.Completable;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxException;
-import io.vertx.core.impl.VertxInternal;
+import io.vertx.core.eventbus.impl.clustered.NodeSelector;
+import io.vertx.core.internal.VertxInternal;
 import io.vertx.core.shareddata.AsyncMap;
 import io.vertx.core.shareddata.Counter;
 import io.vertx.core.shareddata.Lock;
 import io.vertx.core.spi.cluster.ClusterManager;
 import io.vertx.core.spi.cluster.NodeInfo;
 import io.vertx.core.spi.cluster.NodeListener;
-import io.vertx.core.spi.cluster.NodeSelector;
 import io.vertx.core.spi.cluster.RegistrationInfo;
+import io.vertx.core.spi.cluster.RegistrationListener;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,7 +43,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private final RedissonContext redissonContext;
 
   private VertxInternal vertx;
-  private NodeSelector nodeSelector;
+  private RegistrationListener registrationListener;
   private String nodeId;
   private NodeInfo nodeInfo;
   private NodeListener nodeListener;
@@ -83,14 +84,22 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   @Override
-  public void init(Vertx vertx, NodeSelector nodeSelector) {
+  public void init(Vertx vertx) {
     this.vertx = (VertxInternal) vertx;
-    this.nodeSelector = nodeSelector;
   }
 
   @Override
-  public <K, V> void getAsyncMap(String name, Promise<AsyncMap<K, V>> promise) {
-    promise.complete(dataGrid.getAsyncMap(name));
+  public void registrationListener(RegistrationListener registrationListener) {
+    this.registrationListener = registrationListener;
+  }
+
+  @Override
+  public <K, V> void getAsyncMap(String name, Completable<AsyncMap<K, V>> completable) {
+    try {
+      completable.succeed(dataGrid.getAsyncMap(name));
+    } catch (Throwable t) {
+      completable.fail(t);
+    }
   }
 
   @Override
@@ -99,13 +108,26 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   @Override
-  public void getLockWithTimeout(String name, long timeout, Promise<Lock> promise) {
-    dataGrid.getLockWithTimeout(name, timeout).onComplete(promise);
+  public void getLockWithTimeout(String name, long timeout, Completable<Lock> completable) {
+    dataGrid
+        .getLockWithTimeout(name, timeout)
+        .onComplete(
+            ar -> {
+              if (ar.succeeded()) {
+                completable.succeed(ar.result());
+              } else {
+                completable.fail(ar.cause());
+              }
+            });
   }
 
   @Override
-  public void getCounter(String name, Promise<Counter> promise) {
-    promise.complete(dataGrid.getCounter(name));
+  public void getCounter(String name, Completable<Counter> completable) {
+    try {
+      completable.succeed(dataGrid.getCounter(name));
+    } catch (Throwable t) {
+      completable.fail(t);
+    }
   }
 
   @Override
@@ -124,7 +146,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   @Override
-  public void setNodeInfo(NodeInfo nodeInfo, Promise<Void> promise) {
+  public void setNodeInfo(NodeInfo nodeInfo, Completable<Void> completable) {
     vertx
         .<Void>executeBlocking(
             () -> {
@@ -135,7 +157,14 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
               return null;
             },
             false)
-        .onComplete(promise);
+        .onComplete(
+            ar -> {
+              if (ar.succeeded()) {
+                completable.succeed();
+              } else {
+                completable.fail(ar.cause());
+              }
+            });
   }
 
   @Override
@@ -146,7 +175,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   @Override
-  public void getNodeInfo(String nodeId, Promise<NodeInfo> promise) {
+  public void getNodeInfo(String nodeId, Completable<NodeInfo> completable) {
     vertx
         .executeBlocking(
             () -> {
@@ -158,11 +187,18 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
               }
             },
             false)
-        .onComplete(promise);
+        .onComplete(
+            ar -> {
+              if (ar.succeeded()) {
+                completable.succeed(ar.result());
+              } else {
+                completable.fail(ar.cause());
+              }
+            });
   }
 
   @Override
-  public void join(Promise<Void> promise) {
+  public void join(Completable<Void> completable) {
     vertx
         .<Void>executeBlocking(
             () -> {
@@ -178,7 +214,14 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
               }
               return null;
             })
-        .onComplete(promise);
+        .onComplete(
+            ar -> {
+              if (ar.succeeded()) {
+                completable.succeed();
+              } else {
+                completable.fail(ar.cause());
+              }
+            });
   }
 
   private void createCatalogs(RedissonClient redisson) {
@@ -187,10 +230,14 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
     if (subscriptionCatalog != null) {
       subscriptionCatalog =
           new SubscriptionCatalog(
-              subscriptionCatalog, redisson, redissonContext.keyFactory(), nodeSelector);
+              subscriptionCatalog,
+              redisson,
+              redissonContext.keyFactory(),
+              (NodeSelector) registrationListener);
     } else {
       subscriptionCatalog =
-          new SubscriptionCatalog(redisson, redissonContext.keyFactory(), nodeSelector);
+          new SubscriptionCatalog(
+              redisson, redissonContext.keyFactory(), (NodeSelector) registrationListener);
     }
     subscriptionCatalog.removeUnknownSubs(nodeId, nodeInfoCatalog.getNodes());
   }
@@ -241,7 +288,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   private void registerSelfAgain() {
     try (var ignored = CloseableLock.lock(lock)) {
       nodeInfoCatalog.setNodeInfo(getNodeInfo());
-      nodeSelector.registrationsLost();
+      registrationListener.registrationsLost();
 
       vertx.executeBlocking(
           () -> {
@@ -253,7 +300,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
   }
 
   @Override
-  public void leave(Promise<Void> promise) {
+  public void leave(Completable<Void> completable) {
     vertx
         .<Void>executeBlocking(
             () -> {
@@ -278,7 +325,14 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
               }
               return null;
             })
-        .onComplete(promise);
+        .onComplete(
+            ar -> {
+              if (ar.succeeded()) {
+                completable.succeed();
+              } else {
+                completable.fail(ar.cause());
+              }
+            });
   }
 
   private void closeCatalogs() {
@@ -293,7 +347,7 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
 
   @Override
   public void addRegistration(
-      String address, RegistrationInfo registrationInfo, Promise<Void> promise) {
+      String address, RegistrationInfo registrationInfo, Completable<Void> completable) {
     vertx
         .<Void>executeBlocking(
             () -> {
@@ -301,12 +355,19 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
               return null;
             },
             false)
-        .onComplete(promise);
+        .onComplete(
+            ar -> {
+              if (ar.succeeded()) {
+                completable.succeed();
+              } else {
+                completable.fail(ar.cause());
+              }
+            });
   }
 
   @Override
   public void removeRegistration(
-      String address, RegistrationInfo registrationInfo, Promise<Void> promise) {
+      String address, RegistrationInfo registrationInfo, Completable<Void> completable) {
     vertx
         .<Void>executeBlocking(
             () -> {
@@ -314,12 +375,28 @@ public class RedisClusterManager implements ClusterManager, NodeInfoCatalogListe
               return null;
             },
             false)
-        .onComplete(promise);
+        .onComplete(
+            ar -> {
+              if (ar.succeeded()) {
+                completable.succeed();
+              } else {
+                completable.fail(ar.cause());
+              }
+            });
   }
 
   @Override
-  public void getRegistrations(String address, Promise<List<RegistrationInfo>> promise) {
-    vertx.executeBlocking(() -> subscriptionCatalog.get(address), false).onComplete(promise);
+  public void getRegistrations(String address, Completable<List<RegistrationInfo>> completable) {
+    vertx
+        .executeBlocking(() -> subscriptionCatalog.get(address), false)
+        .onComplete(
+            ar -> {
+              if (ar.succeeded()) {
+                completable.succeed(ar.result());
+              } else {
+                completable.fail(ar.cause());
+              }
+            });
   }
 
   /**

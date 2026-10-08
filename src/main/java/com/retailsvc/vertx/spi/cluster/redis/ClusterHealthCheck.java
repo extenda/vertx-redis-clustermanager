@@ -3,7 +3,7 @@ package com.retailsvc.vertx.spi.cluster.redis;
 import io.vertx.core.Handler;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
-import io.vertx.core.impl.VertxInternal;
+import io.vertx.core.internal.VertxInternal;
 import io.vertx.ext.healthchecks.Status;
 import java.util.Objects;
 
@@ -33,7 +33,7 @@ public interface ClusterHealthCheck {
    */
   private static Status getStatus() {
     VertxInternal vertxInternal = (VertxInternal) Vertx.currentContext().owner();
-    RedisClusterManager clusterManager = (RedisClusterManager) vertxInternal.getClusterManager();
+    RedisClusterManager clusterManager = (RedisClusterManager) vertxInternal.clusterManager();
     boolean connected = clusterManager.getRedisInstance().map(RedisInstance::ping).orElse(false);
     return new Status().setOk(connected);
   }

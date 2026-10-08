@@ -1,7 +1,7 @@
 package com.retailsvc.vertx.spi.cluster.redis;
 
 import io.vertx.core.Vertx;
-import io.vertx.core.impl.VertxInternal;
+import io.vertx.core.internal.VertxInternal;
 import io.vertx.core.spi.cluster.ClusterManager;
 import java.util.Optional;
 
@@ -22,7 +22,7 @@ public interface RedisInstance extends RedisDataGrid {
    */
   static Optional<RedisInstance> create(Vertx vertx) {
     if (vertx instanceof VertxInternal vertxInternal) {
-      ClusterManager clusterManager = vertxInternal.getClusterManager();
+      ClusterManager clusterManager = vertxInternal.clusterManager();
       if (clusterManager instanceof RedisClusterManager rcm) {
         return rcm.getRedisInstance();
       }

@@ -6,8 +6,10 @@ import io.vertx.core.Vertx;
 import io.vertx.core.spi.cluster.NodeInfo;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.redisson.api.RMapCache;
@@ -27,12 +29,10 @@ public class NodeInfoCatalog {
   private static final int TTL_SECONDS = 30;
 
   private final RMapCache<String, NodeInfo> nodeInfoMap;
-  private final Vertx vertx;
   private final String nodeId;
   private final List<Integer> listenerIds = new ArrayList<>();
-  private final long timerId;
-  private final ExecutorService executor =
-      Executors.newSingleThreadExecutor(r -> new Thread(r, "vertx-redis-nodeInfo-thread"));
+  private final ScheduledExecutorService heartbeatExecutor;
+  private final ExecutorService listenerExecutor;
   private final AtomicReference<NodeInfo> nodeInfo = new AtomicReference<>();
 
   /**
@@ -50,35 +50,50 @@ public class NodeInfoCatalog {
       RedisKeyFactory keyFactory,
       String nodeId,
       NodeInfoCatalogListener listener) {
-    this.vertx = vertx;
+    Objects.requireNonNull(vertx, "vertx");
     this.nodeId = nodeId;
     nodeInfoMap = redisson.getMapCache(keyFactory.vertx("nodeInfo"));
 
+    listenerExecutor =
+        Executors.newSingleThreadExecutor(
+            r -> {
+              Thread thread = new Thread(r, "vertx-redis-nodeInfo-listener");
+              thread.setDaemon(true);
+              return thread;
+            });
+
+    heartbeatExecutor =
+        Executors.newSingleThreadScheduledExecutor(
+            r -> {
+              Thread thread = new Thread(r, "vertx-redis-nodeInfo-heartbeat");
+              thread.setDaemon(true);
+              return thread;
+            });
+
     // These listeners will detect map modifications from other nodes.
     EntryCreatedListener<String, NodeInfo> entryCreated =
-        event -> executor.submit(() -> listener.memberAdded(event.getKey()));
+        event -> listenerExecutor.submit(() -> listener.memberAdded(event.getKey()));
     EntryRemovedListener<String, NodeInfo> entryRemoved =
-        event -> executor.submit(() -> listener.memberRemoved(event.getKey()));
+        event -> listenerExecutor.submit(() -> listener.memberRemoved(event.getKey()));
     EntryExpiredListener<String, NodeInfo> entryExpired =
-        event -> executor.submit(() -> listener.memberRemoved(event.getKey()));
+        event -> listenerExecutor.submit(() -> listener.memberRemoved(event.getKey()));
 
     listenerIds.add(nodeInfoMap.addListener(entryCreated));
     listenerIds.add(nodeInfoMap.addListener(entryRemoved));
     listenerIds.add(nodeInfoMap.addListener(entryExpired));
 
-    // This periodic timer will keep the node from expiring as long as the process is running.
-    timerId = vertx.setPeriodic(TimeUnit.SECONDS.toMillis(TTL_SECONDS / 2), id -> registerNode());
+    // Keep the node alive for TTL_SECONDS on a dedicated thread so cluster listener work cannot
+    // delay heartbeats past the map entry TTL.
+    heartbeatExecutor.scheduleAtFixedRate(
+        this::registerNodeSync, TTL_SECONDS / 2, TTL_SECONDS / 2, TimeUnit.SECONDS);
   }
 
   /** Register the node in the catalog. This will keep the node alive for TTL_SECONDS. */
-  private void registerNode() {
-    executor.submit(
-        () -> {
-          NodeInfo info = nodeInfo.get();
-          if (info != null) {
-            nodeInfoMap.fastPut(nodeId, info, TTL_SECONDS, TimeUnit.SECONDS);
-          }
-        });
+  private void registerNodeSync() {
+    NodeInfo info = nodeInfo.get();
+    if (info != null) {
+      nodeInfoMap.fastPut(nodeId, info, TTL_SECONDS, TimeUnit.SECONDS);
+    }
   }
 
   /**
@@ -98,7 +113,7 @@ public class NodeInfoCatalog {
    */
   public void setNodeInfo(NodeInfo nodeInfo) {
     this.nodeInfo.set(nodeInfo);
-    registerNode();
+    heartbeatExecutor.execute(this::registerNodeSync);
   }
 
   /**
@@ -122,8 +137,21 @@ public class NodeInfoCatalog {
   /** Close the catalog. */
   public void close() {
     listenerIds.forEach(nodeInfoMap::removeListener);
-    setNodeInfo(null);
-    vertx.cancelTimer(timerId);
+    nodeInfo.set(null);
+    shutdownExecutor(heartbeatExecutor);
+    shutdownExecutor(listenerExecutor);
+  }
+
+  private static void shutdownExecutor(ExecutorService executor) {
+    executor.shutdown();
+    try {
+      if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+        executor.shutdownNow();
+      }
+    } catch (InterruptedException e) {
+      executor.shutdownNow();
+      Thread.currentThread().interrupt();
+    }
   }
 
   @Override
